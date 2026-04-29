@@ -49,4 +49,4 @@ Our approach is based on the **"Experiential Learning"** model. Instead of readi
 - **Evaluation Priority**: Code Quality, Security, and Meaningful Google Services integration.
 
 ---
-*Created for the India's Civic Adventure Hackathon 2024*
+*Created for the India's Civic Adventure Hackathon 2026*

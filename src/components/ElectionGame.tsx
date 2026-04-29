@@ -466,30 +466,30 @@ export default function ElectionGame() {
           </button>
         </div>
 
-        {/* CHAMPION STAT ORBS (REVEAL) */}
+        {/* CHAMPION STAT ORBS (REVEAL) - UPDATED FOR 2026 SCALE */}
         <div className="reveal-on-scroll" style={{
           display: 'flex', justifyContent: 'center', gap: '30px', padding: '50px 20px',
           flexWrap: 'wrap'
         }}>
           <div className="stat-orb" style={{ '--orb-color': '#FF9933', '--orb-glow': 'rgba(255,153,51,0.3)' } as any}>
             <div style={{ fontSize: '2.5rem', fontWeight: 'bold', color: '#FF9933', marginBottom: '8px' }}>
-              <CountUp end={970} suffix="M+" />
+              <CountUp end={1000} suffix="M+" />
             </div>
-            <div style={{ fontSize: '0.8rem', color: '#888', textTransform: 'uppercase', letterSpacing: '2px', fontWeight: '600' }}>Eligible Voters</div>
+            <div style={{ fontSize: '0.8rem', color: '#888', textTransform: 'uppercase', letterSpacing: '2px', fontWeight: '600' }}>Eligible Voters (2026)</div>
           </div>
 
           <div className="stat-orb" style={{ '--orb-color': '#FFFFFF', '--orb-glow': 'rgba(255,255,255,0.2)' } as any}>
             <div style={{ fontSize: '2.5rem', fontWeight: 'bold', color: '#FFFFFF', marginBottom: '8px' }}>
-              <CountUp end={1} suffix="M+" />
+              <CountUp end={1.2} suffix="M+" />
             </div>
             <div style={{ fontSize: '0.8rem', color: '#888', textTransform: 'uppercase', letterSpacing: '2px', fontWeight: '600' }}>Polling Stations</div>
           </div>
 
           <div className="stat-orb" style={{ '--orb-color': '#138808', '--orb-glow': 'rgba(19,136,8,0.3)' } as any}>
             <div style={{ fontSize: '2.5rem', fontWeight: 'bold', color: '#138808', marginBottom: '8px' }}>
-              <CountUp end={18} suffix="M+" />
+              <CountUp end={25} suffix="M+" />
             </div>
-            <div style={{ fontSize: '0.8rem', color: '#888', textTransform: 'uppercase', letterSpacing: '2px', fontWeight: '600' }}>First-Time Youth</div>
+            <div style={{ fontSize: '0.8rem', color: '#888', textTransform: 'uppercase', letterSpacing: '2px', fontWeight: '600' }}>Gen-Z First-Timers</div>
           </div>
         </div>
 
@@ -838,7 +838,7 @@ export default function ElectionGame() {
             Built for the <strong>India's Civic Adventure</strong> hackathon.
           </p>
           <div style={{ marginTop: '40px', color: '#444', fontSize: '0.8rem' }}>
-            © 2024 Chunav Saathi. "Every Vote is a Voice, Every Voice is a Superpower." 🇮🇳
+            © 2026 Chunav Saathi. "Every Vote is a Voice, Every Voice is a Superpower." 🇮🇳
           </div>
         </div>
       </footer>
