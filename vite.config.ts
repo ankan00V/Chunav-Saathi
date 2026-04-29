@@ -12,5 +12,14 @@ export default defineConfig({
         rewrite: (path) => path.replace(/^\/api\/nvidia/, '/v1')
       }
     }
+  },
+  preview: {
+    proxy: {
+      '/api/nvidia': {
+        target: 'https://integrate.api.nvidia.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/nvidia/, '/v1')
+      }
+    }
   }
 })

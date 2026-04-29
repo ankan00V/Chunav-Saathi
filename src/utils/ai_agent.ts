@@ -11,6 +11,7 @@ export const streamAIChat = async (
   onChunk: (chunk: string) => void,
   context: any[] = []
 ) => {
+  console.log("[AI Agent] Starting chat stream for message:", message.substring(0, 50) + "...");
   try {
     const stream = await client.chat.completions.create({
       model: "meta/llama-3.2-3b-instruct",
@@ -88,13 +89,14 @@ Begin every new session with: "Jai Hind! 🇮🇳 Welcome to Chunav Saathi — y
     });
 
     for await (const chunk of stream) {
-      if (chunk.choices && chunk.choices[0]?.delta?.content) {
+      if (chunk.choices && chunk.choices.length > 0 && chunk.choices[0]?.delta?.content) {
         onChunk(chunk.choices[0].delta.content);
       }
     }
+    console.log("[AI Agent] Chat stream completed successfully.");
   } catch (error: any) {
-    console.error("AI Connection Error:", error);
-    const detail = error?.message || "Check API keys and Vercel logs.";
+    console.error("[AI Agent] Chat Error:", error);
+    const detail = error?.message || "Check API keys and network connection.";
     onChunk(`\n[Connection to the AI Matrix lost. Details: ${detail}]`);
   }
 };
@@ -109,43 +111,62 @@ export const generateQuizData = async (
   topic: string,
   onReasoning: (chunk: string) => void
 ) => {
-  const stream = await quizClient.chat.completions.create({
-    model: "meta/llama-3.1-8b-instruct",
-    messages: [
-      { 
-        role: "system", 
-        content: "You are an Indian election quiz generator. Generate exactly 4 multiple choice questions about the provided topic. Return ONLY a valid JSON array of objects. Each object must have: 'q' (the question string with an emoji), 'opts' (an array of 4 option strings), 'ans' (the integer index of the correct option 0-3), and 'explain' (a short explanation string with an emoji). Do not wrap the JSON in markdown code blocks. Output raw JSON only." 
-      },
-      { role: "user", content: `Topic: ${topic}` }
-    ],
-    temperature: 0.3,
-    top_p: 0.9,
-    max_tokens: 2000,
-    stream: true
-  });
-
-  let fullContent = "";
-  for await (const chunk of stream) {
-    const delta = chunk.choices[0]?.delta as any;
-    
-    if (delta?.reasoning_content) {
-      onReasoning(delta.reasoning_content);
-    }
-
-    if (delta?.content) {
-      fullContent += delta.content;
-    }
-  }
-
-  const cleaned = fullContent.substring(
-    fullContent.indexOf('['),
-    fullContent.lastIndexOf(']') + 1
-  );
-  
+  console.log("[AI Agent] Generating quiz for topic:", topic);
   try {
-    return JSON.parse(cleaned);
-  } catch (e) {
-    console.error("Failed to parse AI quiz JSON:", cleaned);
-    throw e;
+    const stream = await quizClient.chat.completions.create({
+      model: "meta/llama-3.1-8b-instruct",
+      messages: [
+        { 
+          role: "system", 
+          content: "You are an Indian election quiz generator. Generate exactly 4 multiple choice questions about the provided topic. Return ONLY a valid JSON array of objects. Each object must have: 'q' (the question string with an emoji), 'opts' (an array of 4 option strings), 'ans' (the integer index of the correct option 0-3), and 'explain' (a short explanation string with an emoji). Do not wrap the JSON in markdown code blocks. Output raw JSON only." 
+        },
+        { role: "user", content: `Topic: ${topic}` }
+      ],
+      temperature: 0.3,
+      top_p: 0.9,
+      max_tokens: 2000,
+      stream: true
+    });
+
+    let fullContent = "";
+    for await (const chunk of stream) {
+      if (!chunk.choices || chunk.choices.length === 0) continue;
+      
+      const delta = chunk.choices[0]?.delta as any;
+      
+      if (delta?.reasoning_content) {
+        onReasoning(delta.reasoning_content);
+      }
+
+      if (delta?.content) {
+        fullContent += delta.content;
+      }
+    }
+
+    console.log("[AI Agent] Quiz stream completed. Raw length:", fullContent.length);
+
+    // More robust JSON extraction
+    const startIndex = fullContent.indexOf('[');
+    const endIndex = fullContent.lastIndexOf(']') + 1;
+    
+    if (startIndex === -1 || endIndex === 0) {
+      console.error("[AI Agent] Could not find JSON array in response:", fullContent);
+      throw new Error("Invalid AI response format: No JSON array found.");
+    }
+
+    const cleaned = fullContent.substring(startIndex, endIndex);
+    
+    try {
+      const parsed = JSON.parse(cleaned);
+      console.log("[AI Agent] Quiz data parsed successfully.");
+      return parsed;
+    } catch (e) {
+      console.error("[AI Agent] Failed to parse AI quiz JSON. Cleaned content:", cleaned);
+      throw e;
+    }
+  } catch (error: any) {
+    console.error("[AI Agent] Quiz Generation Error:", error);
+    throw error; // Rethrow to allow component to fallback to static quiz
   }
 };
+

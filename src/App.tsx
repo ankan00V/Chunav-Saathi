@@ -24,29 +24,37 @@ const AICompanion = () => {
     if (!input.trim()) return;
     
     const userMessage = { role: 'user', content: input };
-    setMessages(prev => [...prev, userMessage]);
+    const history = [...messages, userMessage];
+    
+    // Add user message and a placeholder for the bot's response
+    setMessages(prev => [...prev, userMessage, { role: 'assistant', content: '' }]);
+    const botMsgIndex = history.length; // This will be the index of the placeholder in the new array
+    
     setInput('');
     setIsTyping(true);
 
-    const botMessageIndex = messages.length + 1;
-    setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
-
-    await streamAIChat(
-      userMessage.content,
-      (chunk) => {
-        setMessages(prev => {
-          const newMessages = [...prev];
-          newMessages[botMessageIndex] = {
-            ...newMessages[botMessageIndex],
-            content: newMessages[botMessageIndex].content + chunk
-          };
-          return newMessages;
-        });
-      },
-      messages.map(m => ({ role: m.role, content: m.content }))
-    );
-    
-    setIsTyping(false);
+    try {
+      await streamAIChat(
+        userMessage.content,
+        (chunk) => {
+          setMessages(prev => {
+            const newMessages = [...prev];
+            if (newMessages[botMsgIndex]) {
+              newMessages[botMsgIndex] = {
+                ...newMessages[botMsgIndex],
+                content: newMessages[botMsgIndex].content + chunk
+              };
+            }
+            return newMessages;
+          });
+        },
+        messages.map(m => ({ role: m.role, content: m.content }))
+      );
+    } catch (error) {
+      console.error("Chat error:", error);
+    } finally {
+      setIsTyping(false);
+    }
   };
 
   return (
