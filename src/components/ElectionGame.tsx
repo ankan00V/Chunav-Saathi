@@ -220,27 +220,34 @@ export default function ElectionGame() {
     useEffect(() => {
       const observer = new IntersectionObserver(([entry]) => {
         if (entry.isIntersecting) {
-          let start = 0;
-          const increment = end / (duration / 16);
-          const timer = setInterval(() => {
-            start += increment;
-            if (start >= end) {
-              setCount(end);
-              clearInterval(timer);
-            } else {
-              setCount(Math.floor(start));
+          let startTime: number | null = null;
+          const animate = (timestamp: number) => {
+            if (!startTime) startTime = timestamp;
+            const progress = Math.min((timestamp - startTime) / duration, 1);
+            const currentCount = progress * end;
+            
+            setCount(currentCount);
+            
+            if (progress < 1) {
+              requestAnimationFrame(animate);
             }
-          }, 16);
-          return () => clearInterval(timer);
+          };
+          requestAnimationFrame(animate);
+        } else {
+          // Reset when out of view to allow re-animation
+          setCount(0);
         }
-      }, { threshold: 1 });
+      }, { threshold: 0.1 });
 
       if (countRef.current) observer.observe(countRef.current);
       return () => observer.disconnect();
     }, [end, duration]);
 
-    return <div ref={countRef}>{count.toLocaleString()}{suffix}</div>;
+    // Format the number: use 1 decimal place if it's a decimal, otherwise none
+    const formatted = end % 1 === 0 ? Math.floor(count).toLocaleString() : count.toFixed(1);
+    return <div ref={countRef}>{formatted}{suffix}</div>;
   };
+
 
   useEffect(() => {
     let interval: any;
