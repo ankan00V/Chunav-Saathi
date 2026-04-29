@@ -146,3 +146,30 @@ export const getGeminiDeepDive = async (topic: string) => {
 
 
 
+
+/**
+ * Gemini-Powered Smart Feedback
+ * Analyzes a user's incorrect answer and provides a personalized explanation.
+ */
+export const getSmartFeedback = async (
+  topic: string,
+  question: string,
+  userAnswer: string,
+  correctAnswer: string
+) => {
+  try {
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const prompt = `Topic: ${topic}
+Question: ${question}
+User's Incorrect Choice: ${userAnswer}
+Actual Correct Answer: ${correctAnswer}
+
+Briefly explain why the user's choice is incorrect and why the correct one is right. Tone: Encouraging, short (2 sentences max).`;
+    
+    const result = await model.generateContent(prompt);
+    return result.response.text();
+  } catch (e) {
+    console.warn("Smart feedback failed", e);
+    return null;
+  }
+};

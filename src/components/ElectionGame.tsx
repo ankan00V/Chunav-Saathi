@@ -1,44 +1,13 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import CountUp from './ui/CountUp';
 import ParticleField from './ui/ParticleField';
-import { generateQuizData, getGeminiDeepDive } from '../utils/ai_agent';
+import InfoPanel from './game/InfoPanel';
+import QuizPanel from './game/QuizPanel';
+import BadgeGrid from './game/BadgeGrid';
+
+import type { Badge, QuizQuestion, Phase } from '../types/game';
+import { generateQuizData, getGeminiDeepDive, getSmartFeedback } from '../utils/ai_agent';
 import '../index.css';
-
-/**
- * UI Interfaces
- */
-interface Badge {
-  emoji: string;
-  label: string;
-  id: string;
-}
-
-interface QuizQuestion {
-  q: string;
-  opts: string[];
-  ans: number;
-  explain: string;
-}
-
-interface PhaseInfo {
-  pills: string[];
-  body: string;
-  steps?: { title: string; desc: string }[];
-}
-
-interface Phase {
-  id: string;
-  name: string;
-  icon: string;
-  color: string;
-  bg: string;
-  shadow: string;
-  glow: string;
-  xp: number;
-  info: PhaseInfo;
-  badge: Badge;
-  quiz: QuizQuestion[];
-}
 
 const BADGES: Badge[] = [
   { emoji: '⚖️', label: 'ECI Expert', id: 'eci' },
@@ -50,7 +19,9 @@ const BADGES: Badge[] = [
   { emoji: '🔥', label: 'Quiz Master', id: 'quizmaster' },
   { emoji: '🇮🇳', label: 'Democracy Hero', id: 'allclear' },
 ];
+
 const PHASES: Phase[] = [
+
   {
     id: 'eci', name: 'ECI — The Guardians', icon: '⚖️', xp: 150,
     color: '#FF6B00', bg: 'rgba(255,107,0,0.15)', shadow: 'rgba(255,107,0,0.25)', glow: 'rgba(255,107,0,0.12)',
@@ -306,18 +277,41 @@ export default function ElectionGame() {
     }
   };
 
-  const handleAnswer = (idx: number) => {
+  const handleAnswer = async (idx: number) => {
     if (answered || !currentPhase) return;
     setAnswered(true);
 
     const activeQuiz = dynamicQuiz || currentPhase.quiz;
     const q = activeQuiz[qIdx];
+    
     if (idx === q.ans) {
       setFeedback({ correct: true, text: '✅ Sahi jawab! <strong>Shabash!</strong> — ' + q.explain });
       setXp(prev => prev + 30);
       setDp(prev => prev + 50);
     } else {
-      setFeedback({ correct: false, text: '❌ Galat hai! Sahi jawab: <strong>' + q.opts[q.ans] + '</strong> — ' + q.explain });
+      // Trigger Gemini Smart Feedback for incorrect answer
+      setFeedback({ correct: false, text: '❌ Galat hai! Sahi jawab: <strong>' + q.opts[q.ans] + '</strong><br/><br/><i>Thinking... Gemini is analyzing your choice...</i>' });
+      
+      try {
+        const smartExplanation = await getSmartFeedback(
+          currentPhase.name,
+          q.q,
+          q.opts[idx],
+          q.opts[q.ans]
+        );
+        
+        if (smartExplanation) {
+          setFeedback({ 
+            correct: false, 
+            text: `❌ Galat hai! Sahi jawab: <strong>${q.opts[q.ans]}</strong><br/><br/>✨ <strong>Gemini Analysis:</strong> ${smartExplanation}<br/><br/>${q.explain}` 
+          });
+        } else {
+          setFeedback({ correct: false, text: '❌ Galat hai! Sahi jawab: <strong>' + q.opts[q.ans] + '</strong> — ' + q.explain });
+        }
+      } catch (e) {
+        setFeedback({ correct: false, text: '❌ Galat hai! Sahi jawab: <strong>' + q.opts[q.ans] + '</strong> — ' + q.explain });
+      }
+      
       setDp(prev => prev + 10);
     }
   };
@@ -516,7 +510,7 @@ export default function ElectionGame() {
           </div>
         </section>
 
-        <div className="score-box">
+        <div className="score-box" aria-live="polite">
           <div className="score-left">
             <h3>Democracy Points</h3>
             <p>{dp} DP</p>
@@ -621,167 +615,32 @@ export default function ElectionGame() {
 
 
         {activePanel === 'info' && currentPhase && (
-          <div id="info-panel" style={{ display: 'block' }}>
-            <div className="info-header">
-              <div>
-                <div className="quiz-phase-badge" style={{ background: currentPhase.bg, color: currentPhase.color, borderColor: currentPhase.color + '50' }}>
-                  {currentPhase.icon} {currentPhase.name}
-                </div>
-                <div className="info-title" style={{ marginTop: '10px' }}>Learn: {currentPhase.name}</div>
-              </div>
-              <button className="quiz-close" onClick={() => setActivePanel('none')}>✕</button>
-            </div>
-            <div className="info-body" dangerouslySetInnerHTML={{ __html: currentPhase.info.body.replace(/\n/g, '<br><br>') }}></div>
-
-            {/* Google Service Integration: Gemini Deep Dive */}
-            {deepDiveText ? (
-              <div className="reveal-on-scroll" style={{ 
-                marginTop: '30px', 
-                padding: '20px', 
-                background: 'rgba(66,133,244,0.05)', 
-                border: '1px solid rgba(66,133,244,0.2)', 
-                borderRadius: '15px' 
-              }}>
-                <div style={{ color: '#4285F4', fontSize: '0.7rem', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <img src="https://www.gstatic.com/lamda/images/gemini_sparkle_v002_d4735304ff6298a2f2444.svg" width="16" alt="" />
-                  Gemini Expert Deep-Dive
-                </div>
-                <p style={{ fontSize: '0.9rem', color: '#ccc', lineHeight: '1.6', fontStyle: 'italic' }}>{deepDiveText}</p>
-              </div>
-            ) : (
-              <div style={{ marginTop: '30px', padding: '15px', color: '#666', fontSize: '0.8rem', textAlign: 'center' }}>
-                Consulting Gemini for expert analysis...
-              </div>
-            )}
-
-            {/* Timeline Steps */}
-            {currentPhase.info.steps && (
-              <div className="phase-timeline">
-                <h4 className="timeline-header">Timeline & Steps</h4>
-                <div className="timeline-track">
-                  {currentPhase.info.steps.map((step: { title: string; desc: string }, idx: number) => (
-                    <div key={idx} className="timeline-step">
-                      <div className="timeline-dot" style={{ borderColor: currentPhase.color, background: currentPhase.bg }}></div>
-                      <div className="timeline-content">
-                        <div className="step-title" style={{ color: currentPhase.color }}>{step.title}</div>
-                        <div className="step-desc">{step.desc}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="fact-pills">
-              {currentPhase.info.pills.map((p, i) => (
-                <span key={i} className={`fact-pill ${i < 2 ? 'highlight' : ''}`}>{p}</span>
-              ))}
-            </div>
-            <button className="info-quiz-btn" onClick={startQuiz}>⚡ Take the Quiz</button>
-          </div>
+          <InfoPanel 
+            currentPhase={currentPhase}
+            deepDiveText={deepDiveText}
+            onClose={() => setActivePanel('none')}
+            onStartQuiz={startQuiz}
+          />
         )}
 
         {activePanel === 'quiz' && currentPhase && (
-          <div id="quiz-panel" style={{ display: 'block' }}>
-            <div className="quiz-header">
-              <div className="quiz-phase-badge" style={{ background: currentPhase.bg, color: currentPhase.color, borderColor: currentPhase.color + '50' }}>
-                {currentPhase.icon} {currentPhase.name}
-              </div>
-              <button className="quiz-close" onClick={() => setActivePanel('none')}>✕</button>
-            </div>
-
-            {isGenerating ? (
-              <div style={{ padding: '3rem', textAlign: 'center' }}>
-                <div style={{ fontSize: '3rem', marginBottom: '1rem', animation: 'pulse 1.5s infinite' }}>🧠</div>
-                <h3 style={{ color: 'var(--gold)', fontFamily: "'Baloo 2', cursive" }}>Chunav Saathi is crafting your custom quiz...</h3>
-                <div style={{
-                  marginTop: '1.5rem',
-                  padding: '1rem',
-                  background: 'rgba(255,255,255,0.05)',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  borderRadius: '12px',
-                  minHeight: '80px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  transition: 'opacity 0.3s ease-in-out'
-                }}>
-                  <div style={{ textAlign: 'center' }}>
-                    <p key={factIdx} style={{
-                      color: 'var(--gold)',
-                      fontSize: '0.9rem',
-                      fontStyle: 'italic',
-                      marginBottom: '10px',
-                      opacity: 0.8
-                    }}>
-                      {FUN_FACTS[factIdx]}
-                    </p>
-                    <p style={{
-                      color: '#fff',
-                      fontSize: '0.85rem',
-                      margin: 0,
-                      opacity: 0.6,
-                      lineHeight: '1.4'
-                    }}>
-                      {reasoningText || "Initializing AI logic..."}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              (() => {
-                const activeQuiz = dynamicQuiz || currentPhase.quiz;
-                if (!activeQuiz || !activeQuiz[qIdx]) return null;
-                return (
-                  <>
-                    <div className="quiz-progress">
-                      {activeQuiz.map((_, i) => (
-                        <div key={i} className={`qp-dot ${i < qIdx ? 'done' : i === qIdx ? 'current' : ''}`}></div>
-                      ))}
-                    </div>
-                    <div className="quiz-q">{activeQuiz[qIdx].q}</div>
-                    <div className="options">
-                      {activeQuiz[qIdx].opts.map((o: string, i: number) => {
-                        let btnCls = 'opt-btn';
-                        if (answered) {
-                          if (i === activeQuiz[qIdx].ans) btnCls += ' correct';
-                          else if (feedback && !feedback.correct) btnCls += ' wrong';
-                        }
-                        return (
-                          <button key={i} className={btnCls} onClick={() => handleAnswer(i)} disabled={answered}>
-                            <span className="opt-letter">{['A', 'B', 'C', 'D'][i]}</span>
-                            {o}
-                          </button>
-                        )
-                      })}
-                    </div>
-                    {feedback && (
-                      <div className={`quiz-feedback ${feedback.correct ? 'correct' : 'wrong'}`} style={{ display: 'block' }} dangerouslySetInnerHTML={{ __html: feedback.text }}></div>
-                    )}
-                    {answered && (
-                      <button className="quiz-next" style={{ display: 'inline-block' }} onClick={nextQuestion}>Next →</button>
-                    )}
-                  </>
-                );
-              })()
-            )}
-          </div>
+          <QuizPanel 
+            currentPhase={currentPhase}
+            dynamicQuiz={dynamicQuiz}
+            qIdx={qIdx}
+            answered={answered}
+            feedback={feedback}
+            isGenerating={isGenerating}
+            factIdx={factIdx}
+            reasoningText={reasoningText}
+            funFacts={FUN_FACTS}
+            onAnswer={handleAnswer}
+            onNext={nextQuestion}
+            onClose={() => setActivePanel('none')}
+          />
         )}
 
-        <div className="badges-section">
-          <div className="badges-title">🏅 Your Badges</div>
-          <div className="badges-row">
-            {BADGES.map((b) => {
-              const earned = earnedBadges.includes(b.id);
-              return (
-                <div key={b.id} className={`badge-item ${earned ? 'earned' : ''}`}>
-                  <span className="badge-emoji">{b.emoji}</span>
-                  <span className="badge-label">{b.label}</span>
-                </div>
-              )
-            })}
-          </div>
-        </div>
+        <BadgeGrid badges={BADGES} earnedBadges={earnedBadges} />
       </div>
 
       {showCelebration && (

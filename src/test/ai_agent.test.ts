@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { streamAIChat } from '../utils/ai_agent';
+import { streamAIChat, getGeminiDeepDive, getSmartFeedback } from '../utils/ai_agent';
 
 // Mock Google Generative AI
 vi.mock('@google/generative-ai', () => ({
@@ -13,11 +13,17 @@ vi.mock('@google/generative-ai', () => ({
               { text: () => ' Welcome to Chunav Saathi!' }
             ]
           })
+        }),
+        generateContent: vi.fn().mockResolvedValue({
+          response: {
+            text: () => 'Jai Hind! Welcome to Chunav Saathi!'
+          }
         })
       };
     }
   }
 }));
+
 
 // Mock OpenAI
 vi.mock('openai', () => {
@@ -39,6 +45,9 @@ vi.mock('openai', () => {
 });
 
 
+
+
+
 describe('AI Agent', () => {
   it('should stream AI chat chunks', async () => {
     const onChunk = vi.fn();
@@ -47,4 +56,18 @@ describe('AI Agent', () => {
     expect(onChunk).toHaveBeenCalledWith('Jai Hind!');
     expect(onChunk).toHaveBeenCalledWith(' Welcome to Chunav Saathi!');
   });
+
+  it('should get expert deep dive from Gemini', async () => {
+    const result = await getGeminiDeepDive('ECI');
+    expect(result).toBeDefined();
+    // Since we mocked it to return 'Jai Hind! Welcome to Chunav Saathi!', we check that
+    expect(result).toContain('Jai Hind!');
+  });
+
+  it('should get smart feedback from Gemini', async () => {
+    const result = await getSmartFeedback('ECI', 'Who runs elections?', 'President', 'ECI');
+    expect(result).toBeDefined();
+    expect(result).toContain('Jai Hind!');
+  });
 });
+
