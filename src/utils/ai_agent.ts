@@ -1,26 +1,39 @@
 import OpenAI from "openai";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-// 1. Primary Engines (NVIDIA NIM)
+// Fix for CORS issues: Use the local proxy defined in vite.config.ts
+const getBaseURL = () => {
+  if (typeof window !== "undefined") {
+    return `${window.location.origin}/api/nvidia`;
+  }
+  return "/api/nvidia";
+};
+
+// 1. Primary Engines (NVIDIA NIM) - Using Proxy to avoid CORS errors
 const client = new OpenAI({
-  baseURL: "https://integrate.api.nvidia.com/v1",
+  baseURL: getBaseURL(),
   apiKey: import.meta.env.VITE_LMA_API_KEY || "",
   dangerouslyAllowBrowser: true,
 });
 
 const quizClient = new OpenAI({
-  baseURL: "https://integrate.api.nvidia.com/v1",
+  baseURL: getBaseURL(),
   apiKey: import.meta.env.VITE_KIMI_API_KEY || "",
   dangerouslyAllowBrowser: true,
 });
 
 // 2. Specialized Google Service (Gemini)
-// Used for "High-Fidelity Fact Checking" and "Detailed Deep Dives"
+// Gemini SDK handles its own requests, no proxy needed
 const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY || "");
 
 const SYSTEM_PROMPT = `You are Chunav Saathi — a vibrant, gamified AI guide for India's elections. 
-Style: Punchy, warm, celebratory. Use Hindi phrases.
-Format: [Short intro] \n\n • [Bullet 1] \n\n • [Bullet 2] \n\n Samjhe nagrik? 😉`;
+Personality: Think Duolingo meets IPL commentary. Punchy, warm, celebratory. Use Hindi phrases naturally (Jai Hind! Mera vote, meri awaaz!).
+Format Rules:
+- BE EXTREMELY BRIEF AND CONVERSATIONAL.
+- ALWAYS use emojis.
+- Language: English with natural Hindi phrases.
+- Template: [Short intro] \n\n • [Point 1] \n\n • [Point 2] \n\n Samjhe nagrik? 😉`;
+
 
 /**
  * Primary Chat: Powered by Llama 3.2 (NVIDIA)
