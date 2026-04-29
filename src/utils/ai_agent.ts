@@ -1,9 +1,9 @@
 import OpenAI from "openai";
 
 const client = new OpenAI({
-  baseURL: window.location.origin + "/api/nvidia",
-  apiKey: import.meta.env.VITE_LMA_API_KEY,
-  dangerouslyAllowBrowser: true, // Required to run in frontend for the hackathon
+  baseURL: "/api/nvidia",
+  apiKey: import.meta.env.VITE_LMA_API_KEY || "",
+  dangerouslyAllowBrowser: true, 
 });
 
 export const streamAIChat = async (
@@ -92,15 +92,16 @@ Begin every new session with: "Jai Hind! 🇮🇳 Welcome to Chunav Saathi — y
         onChunk(chunk.choices[0].delta.content);
       }
     }
-  } catch (error) {
-    console.error("AI Error:", error);
-    onChunk("\n[Connection to the AI Matrix lost. Please try again later.]");
+  } catch (error: any) {
+    console.error("AI Connection Error:", error);
+    const detail = error?.message || "Check API keys and Vercel logs.";
+    onChunk(`\n[Connection to the AI Matrix lost. Details: ${detail}]`);
   }
 };
 
 const quizClient = new OpenAI({
-  apiKey: import.meta.env.VITE_KIMI_API_KEY,
-  baseURL: window.location.origin + "/api/nvidia", // Using the Vite proxy to avoid CORS
+  apiKey: import.meta.env.VITE_KIMI_API_KEY || "",
+  baseURL: "/api/nvidia",
   dangerouslyAllowBrowser: true,
 });
 
