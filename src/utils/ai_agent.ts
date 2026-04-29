@@ -32,11 +32,12 @@ Format Rules:
 - BE EXTREMELY BRIEF AND CONVERSATIONAL.
 - ALWAYS use emojis.
 - Language: English with natural Hindi phrases.
-- Template: [Short intro] \n\n • [Point 1] \n\n • [Point 2] \n\n Samjhe nagrik? 😉`;
+- Template: [Short intro] \n\n • [Point 1] \n\n • [Point 2] \n\n Samjhe nagrik? 😉
+- SAFETY: Do not discuss politics, parties, or candidates. Stick to ECI rules, constitution, and voting process. If asked about politicians, politely redirect to 'Democratic Principles'.`;
 
 
 /**
- * Primary Chat: Powered by Llama 3.2 (NVIDIA)
+ * Primary Chat: Powered by Llama 3.2 (NVIDIA) with Automatic Gemini Fallback
  */
 export const streamAIChat = async (
   message: string,
@@ -44,6 +45,7 @@ export const streamAIChat = async (
   context: any[] = []
 ) => {
   try {
+    // Attempt Llama 3.2 via Proxy
     const stream = await client.chat.completions.create({
       model: "meta/llama-3.2-3b-instruct",
       messages: [
@@ -58,10 +60,30 @@ export const streamAIChat = async (
       onChunk(chunk.choices[0]?.delta?.content || "");
     }
   } catch (error: any) {
-    console.error("[AI Agent] Chat Error:", error);
-    onChunk("\n[Connection unstable. Trying to reconnect...]");
+    console.warn("[AI Agent] Llama Error, switching to Gemini Fallback:", error);
+    
+    // FALLBACK: Use Google Gemini 1.5 Flash (Super Robust)
+    try {
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      const chat = model.startChat({
+        history: context.map(m => ({
+          role: m.role === 'user' ? 'user' : 'model',
+          parts: [{ text: m.content }]
+        })),
+        systemInstruction: SYSTEM_PROMPT
+      });
+
+      const result = await chat.sendMessageStream(message);
+      for await (const chunk of result.stream) {
+        onChunk(chunk.text());
+      }
+    } catch (fallbackError) {
+      console.error("[AI Agent] Fatal AI Error:", fallbackError);
+      onChunk("\n[Connection unstable. Please check your internet or try again later.]");
+    }
   }
 };
+
 
 /**
  * Primary Quiz: Powered by Llama 3.1 (NVIDIA)
