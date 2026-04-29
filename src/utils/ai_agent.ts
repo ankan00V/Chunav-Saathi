@@ -1,15 +1,23 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import OpenAI from "openai";
 
-// Initialize the Gemini API
+// 1. Initialize Gemini (Primary Brain)
 const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY || "");
 
-/**
- * Message interface for chat history
- */
-interface ChatMessage {
-  role: "user" | "model" | "system";
-  parts: { text: string }[];
-}
+// 2. Initialize NVIDIA NIM Clients (The "Resilience" Layer)
+// Using Llama 3.2 for fast fallbacks
+const fallbackClient = new OpenAI({
+  baseURL: "https://integrate.api.nvidia.com/v1",
+  apiKey: import.meta.env.VITE_LMA_API_KEY || "",
+  dangerouslyAllowBrowser: true,
+});
+
+// Using Llama 3.1 for background reasoning/fact-checking
+const reasoningClient = new OpenAI({
+  baseURL: "https://integrate.api.nvidia.com/v1",
+  apiKey: import.meta.env.VITE_KIMI_API_KEY || "",
+  dangerouslyAllowBrowser: true,
+});
 
 /**
  * System prompt for the AI agent
@@ -29,49 +37,25 @@ KNOWLEDGE TOPICS TO MASTER AND TEACH:
 
 YOUR PERSONALITY & STYLE: Think Duolingo meets IPL commentary meets a wise dadi. Be punchy, warm, celebratory. Use Hindi phrases naturally (Jai Hind! Mera vote, meri awaaz!). Celebrate every correct answer with confetti energy. Never lecture — always show, quiz, explore. Use emojis generously. Make complex rules feel like game mechanics.
 
-GAMIFICATION RULES:
-- Award Democracy Points (DP) for each topic completed
-- Unlock badges: 🗳️ Pehli Baar Voter · 📜 Constitution Champ · 🏛️ Lok Sabha Legend · 🌟 ECI Expert · ⚖️ NOTA Ninja · 🏆 Chunav Champion
-- Show a visual progress bar through the 6 election phases (Level 1 to Level 6)
-- Offer a Final Challenge Quiz at the end with a shareable Democracy Score
-
 OUTPUT FORMAT RULES:
-- BE EXTREMELY BRIEF AND CONVERSATIONAL. Never write long paragraphs.
-- If the user says a simple greeting (e.g., "hi", "hello"), reply with ONLY a short, warm greeting and ask what they want to learn. DO NOT dump information.
+- BE EXTREMELY BRIEF AND CONVERSATIONAL.
 - ALWAYS use emojis.
-- Talk like a friendly human guide (Chunav Saathi), not a Wikipedia page. Keep it punchy and fun!
-- Maximum response length: 3 short sentences or bullet points.
 - Language: primarily English with natural Hindi phrases woven in.
-
-STRICT SPACING TEMPLATE:
-When answering a question, you MUST format your answer EXACTLY like this:
-[Short introductory sentence with emoji]
-
-• [Bullet Point 1]
-
-• [Bullet Point 2]
-
-• [Bullet Point 3]
-
-Samjhe nagrik? 😉
-
-Begin every new session with: "Jai Hind! 🇮🇳 Welcome to Chunav Saathi — your ultimate guide to India's greatest festival of democracy! Ready to become a true Chunav Champion? Let's start your journey! 🚀"`;
+- Format: [Intro] \n\n • [Point 1] \n\n • [Point 2] \n\n Samjhe nagrik? 😉`;
 
 /**
- * Streams AI chat responses using Google Gemini
+ * Streams AI chat responses using a Multi-Model Fallback system
  */
 export const streamAIChat = async (
   message: string,
   onChunk: (chunk: string) => void,
   context: any[] = []
 ) => {
-  console.log("[AI Agent] Starting Gemini chat stream...");
+  console.log("[AI Agent] Attempting Primary Gemini Stream...");
   
   try {
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
-    // Transform context to Gemini format
-    const history: any[] = context.map(msg => ({
+    const history = context.map(msg => ({
       role: msg.role === "user" ? "user" : "model",
       parts: [{ text: msg.content }]
     }));
@@ -79,29 +63,41 @@ export const streamAIChat = async (
     const chat = model.startChat({
       history: [
         { role: "user", parts: [{ text: SYSTEM_PROMPT }] },
-        { role: "model", parts: [{ text: "Understood, nagrik! I am ready to guide India's voters with tricolor energy! 🇮🇳" }] },
+        { role: "model", parts: [{ text: "Understood, nagrik! I am ready! 🇮🇳" }] },
         ...history
       ]
     });
 
     const result = await chat.sendMessageStream(message);
-
     for await (const chunk of result.stream) {
-      const chunkText = chunk.text();
-      onChunk(chunkText);
+      onChunk(chunk.text());
     }
+  } catch (geminiError) {
+    console.warn("[AI Agent] Gemini Failed. Activating Llama-3.2 Fallback...", geminiError);
+    onChunk("\n[Switching to Backup AI Core for stability...]\n");
     
-    console.log("[AI Agent] Gemini stream completed.");
-  } catch (error: any) {
-    console.error("[AI Agent] Gemini Error:", error);
-    const detail = error?.message || "Check your Gemini API key.";
-    onChunk(`\n[Connection to the AI Matrix lost. Details: ${detail}]`);
+    try {
+      const stream = await fallbackClient.chat.completions.create({
+        model: "meta/llama-3.2-3b-instruct",
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          ...context,
+          { role: "user", content: message }
+        ],
+        stream: true,
+      });
+
+      for await (const chunk of stream) {
+        const content = chunk.choices[0]?.delta?.content || "";
+        onChunk(content);
+      }
+    } catch (fallbackError: any) {
+      console.error("[AI Agent] All models failed.", fallbackError);
+      onChunk("\n[Connection lost. Please check your internet connection.]");
+    }
   }
 };
 
-/**
- * Interface for Quiz Question
- */
 interface QuizQuestion {
   q: string;
   opts: string[];
@@ -110,46 +106,48 @@ interface QuizQuestion {
 }
 
 /**
- * Generates quiz data using Google Gemini
+ * Generates quiz data using Model Parallelism
  */
 export const generateQuizData = async (
   topic: string,
   onReasoning: (chunk: string) => void
 ): Promise<QuizQuestion[]> => {
-  console.log("[AI Agent] Generating quiz via Gemini for:", topic);
+  console.log("[AI Agent] Generating Quiz with Parallel Reasoning...");
   
+  // Use Llama 3.1 for the "Reasoning/Thought" process in the background
+  const runReasoning = async () => {
+    try {
+      const stream = await reasoningClient.chat.completions.create({
+        model: "meta/llama-3.1-8b-instruct",
+        messages: [{ role: "user", content: `Think about complex facts regarding ${topic} for a quiz.` }],
+        stream: true
+      });
+      for await (const chunk of stream) {
+        onReasoning(chunk.choices[0]?.delta?.content || "");
+      }
+    } catch (e) { console.warn("Reasoning layer failed, skipping..."); }
+  };
+
+  // Run reasoning in background while Gemini generates the JSON
+  runReasoning();
+
   try {
     const model = genAI.getGenerativeModel({ 
       model: "gemini-1.5-flash",
-      generationConfig: {
-        responseMimeType: "application/json",
-      }
+      generationConfig: { responseMimeType: "application/json" }
     });
 
-    const prompt = `You are an Indian election quiz generator. Topic: ${topic}. 
-    Generate exactly 4 multiple choice questions.
-    Return a JSON array of objects with these keys: 
-    "q" (string with emoji), 
-    "opts" (array of 4 strings), 
-    "ans" (integer index 0-3), 
-    "explain" (string with emoji).
-    
-    Example: [{"q": "❓ Question?", "opts": ["A", "B", "C", "D"], "ans": 0, "explain": "Reasoning 💡"}]`;
+    const prompt = `Generate exactly 4 multiple choice questions about ${topic}. 
+    Return a JSON array: [{"q": "...", "opts": ["...", "...", "...", "..."], "ans": 0, "explain": "..."}]`;
 
     const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text();
-    
-    // Gemini can sometimes wrap JSON in code blocks even with responseMimeType
-    const cleaned = text.replace(/```json/g, "").replace(/```/g, "").trim();
-    const parsed = JSON.parse(cleaned);
-    
+    const parsed = JSON.parse(result.response.text().replace(/```json/g, "").replace(/```/g, "").trim());
     return parsed;
-  } catch (error: any) {
+  } catch (error) {
     console.error("[AI Agent] Quiz Generation Error:", error);
-    onReasoning("AI is having a momentary glitch... falling back to standard questions.");
     throw error;
   }
 };
+
 
 
