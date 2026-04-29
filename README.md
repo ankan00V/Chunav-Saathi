@@ -5,10 +5,21 @@
 
 ---
 
-## 🏛️ Challenge Vertical: Civic & Government
-Our solution focuses on the **Civic Education & Voter Engagement** persona. It targets first-time voters (Gen-Z) and citizens seeking a deeper, more engaging way to understand the ECI (Election Commission of India) framework.
+## 🧩 System Architecture
+
+```mermaid
+graph TD
+    A[Voter Persona] -->|Interactive 3D| B(Metaverse UI)
+    B -->|AI Context| C{Google Gemini 1.5}
+    B -->|Real-time Streams| D[NVIDIA NIM Engine]
+    C -->|Deep Dive Analysis| E[Educational Insights]
+    D -->|Dynamic Quiz Generation| F[Gamified Levels]
+    F -->|XP & Badges| G[Voter Empowerment]
+    B -->|Event Tracking| H[Google Analytics]
+```
 
 ---
+
 
 ## 🏗️ Technical Excellence (Senior Level Refactor)
 

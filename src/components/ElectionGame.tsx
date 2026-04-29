@@ -7,7 +7,9 @@ import BadgeGrid from './game/BadgeGrid';
 
 import type { Badge, QuizQuestion, Phase } from '../types/game';
 import { generateQuizData, getGeminiDeepDive, getSmartFeedback } from '../utils/ai_agent';
+import { trackQuizCompletion, trackBadgeEarned, trackEvent } from '../utils/analytics';
 import '../index.css';
+
 
 const BADGES: Badge[] = [
   { emoji: '⚖️', label: 'ECI Expert', id: 'eci' },
@@ -159,6 +161,10 @@ const RANKS = [
 ];
 
 export default function ElectionGame() {
+  useEffect(() => {
+    trackEvent('session_start', { method: 'direct' });
+  }, []);
+
   const [xp, setXp] = useState(0);
   const [dp, setDp] = useState(0);
   const [completed, setCompleted] = useState<string[]>([]);
@@ -322,6 +328,7 @@ export default function ElectionGame() {
     const activeQuiz = dynamicQuiz || currentPhase.quiz;
     if (qIdx + 1 >= activeQuiz.length) {
       // Completed Phase
+      trackQuizCompletion(currentPhase.name, 30);
       if (!completed.includes(currentPhase.id)) {
         const newCompleted = [...completed, currentPhase.id];
         setCompleted(newCompleted);
@@ -329,9 +336,20 @@ export default function ElectionGame() {
         setDp(prev => prev + currentPhase.xp);
 
         let newBadges = [...earnedBadges];
-        if (!newBadges.includes(currentPhase.id)) newBadges.push(currentPhase.id);
-        if (newCompleted.length >= 6 && !newBadges.includes('allclear')) newBadges.push('allclear');
-        if (xp + currentPhase.xp >= 600 && !newBadges.includes('quizmaster')) newBadges.push('quizmaster');
+        const newBadge = currentPhase.badge;
+        if (!earnedBadges.includes(newBadge.id)) {
+          setEarnedBadges(prev => [...prev, newBadge.id]);
+          trackBadgeEarned(newBadge.id, newBadge.label);
+          newBadges.push(newBadge.id);
+        }
+        if (newCompleted.length >= 6 && !newBadges.includes('allclear')) {
+          newBadges.push('allclear');
+          trackBadgeEarned('allclear', 'Democracy Hero');
+        }
+        if (xp + currentPhase.xp >= 600 && !newBadges.includes('quizmaster')) {
+          newBadges.push('quizmaster');
+          trackBadgeEarned('quizmaster', 'Quiz Master');
+        }
 
         setEarnedBadges(newBadges);
       }
