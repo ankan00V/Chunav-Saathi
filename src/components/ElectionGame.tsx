@@ -166,6 +166,7 @@ export default function ElectionGame() {
   const [showCelebration, setShowCelebration] = useState<any>(null);
 
   const [isGenerating, setIsGenerating] = useState(false);
+  const [reasoningText, setReasoningText] = useState<string>("");
   const [dynamicQuiz, setDynamicQuiz] = useState<any[] | null>(null);
   const [factIdx, setFactIdx] = useState(0);
 
@@ -273,7 +274,7 @@ export default function ElectionGame() {
       setIsGenerating(true);
       setReasoningText("");
       try {
-        const quizList = await generateQuizData(currentPhase.name, (reasoningChunk) => {
+        const quizList = await generateQuizData(currentPhase.name, (reasoningChunk: string) => {
           setReasoningText(prev => prev + reasoningChunk);
         });
         setDynamicQuiz(quizList);
@@ -650,14 +651,26 @@ export default function ElectionGame() {
                   justifyContent: 'center',
                   transition: 'opacity 0.3s ease-in-out'
                 }}>
-                  <p key={factIdx} style={{
-                    color: '#fff',
-                    fontSize: '1rem',
-                    margin: 0,
-                    animation: 'fadeInUp 0.5s ease-out forwards'
-                  }}>
-                    {FUN_FACTS[factIdx]}
-                  </p>
+                  <div style={{ textAlign: 'center' }}>
+                    <p key={factIdx} style={{
+                      color: 'var(--gold)',
+                      fontSize: '0.9rem',
+                      fontStyle: 'italic',
+                      marginBottom: '10px',
+                      opacity: 0.8
+                    }}>
+                      {FUN_FACTS[factIdx]}
+                    </p>
+                    <p style={{
+                      color: '#fff',
+                      fontSize: '0.85rem',
+                      margin: 0,
+                      opacity: 0.6,
+                      lineHeight: '1.4'
+                    }}>
+                      {reasoningText || "Initializing AI logic..."}
+                    </p>
+                  </div>
                 </div>
               </div>
             ) : (
