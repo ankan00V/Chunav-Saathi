@@ -1,5 +1,7 @@
 import React from 'react';
+import DOMPurify from 'dompurify';
 import type { Phase } from '../../types/game';
+import { useFocusTrap } from '../../hooks/useFocusTrap';
 
 interface InfoPanelProps {
   currentPhase: Phase;
@@ -14,8 +16,12 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   onClose, 
   onStartQuiz 
 }) => {
+  const containerRef = useFocusTrap(true);
+  const sanitizedBody = DOMPurify.sanitize(currentPhase.info.body.replace(/\n/g, '<br><br>'));
+  
   return (
-    <div id="info-panel" style={{ display: 'block' }}>
+    <div id="info-panel" ref={containerRef} style={{ display: 'block' }} role="dialog" aria-modal="true">
+
       <div className="info-header">
         <div>
           <div className="quiz-phase-badge" style={{ background: currentPhase.bg, color: currentPhase.color, borderColor: currentPhase.color + '50' }}>
@@ -25,7 +31,8 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
         </div>
         <button className="quiz-close" onClick={onClose} aria-label="Close Info Panel">✕</button>
       </div>
-      <div className="info-body" dangerouslySetInnerHTML={{ __html: currentPhase.info.body.replace(/\n/g, '<br><br>') }}></div>
+      <div className="info-body" dangerouslySetInnerHTML={{ __html: sanitizedBody }}></div>
+
 
       {/* Google Service Integration: Gemini Deep Dive */}
       {deepDiveText ? (

@@ -1,9 +1,44 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import DOMPurify from 'dompurify';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Shield, Send, X } from 'lucide-react';
+import { Shield, Send, X, Loader2 } from 'lucide-react';
 import { streamAIChat } from './utils/ai_agent';
-import ElectionGame from './components/ElectionGame';
 import './index.css';
+
+// Lazy load the heavy game component for efficiency
+const ElectionGame = lazy(() => import('./components/ElectionGame'));
+
+const LoadingScreen = () => (
+  <div style={{ 
+    height: '100vh', width: '100vw', 
+    background: 'var(--bg-dark)', 
+    display: 'flex', flexDirection: 'column', 
+    alignItems: 'center', justifyContent: 'center',
+    gap: '20px'
+  }}>
+    <motion.div
+      animate={{ 
+        scale: [1, 1.2, 1],
+        rotate: [0, 180, 360],
+        filter: ['drop-shadow(0 0 10px #FF9933)', 'drop-shadow(0 0 30px #FF9933)', 'drop-shadow(0 0 10px #FF9933)']
+      }}
+      transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+    >
+      <Shield size={80} color="#FF9933" />
+    </motion.div>
+    <div style={{ textAlign: 'center' }}>
+      <h2 style={{ fontFamily: "'Baloo 2', cursive", color: 'white', margin: 0 }}>Chunav Saathi</h2>
+      <p style={{ color: 'var(--gold)', fontSize: '0.9rem', opacity: 0.8 }}>Initializing Indian Democracy Metaverse...</p>
+    </div>
+    <div style={{ width: '200px', height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', overflow: 'hidden' }}>
+      <motion.div 
+        animate={{ x: [-200, 200] }}
+        transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+        style={{ width: '100%', height: '100%', background: 'linear-gradient(90deg, transparent, #FF9933, transparent)' }}
+      />
+    </div>
+  </div>
+);
 
 const AICompanion = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -26,9 +61,8 @@ const AICompanion = () => {
     const userMessage = { role: 'user', content: input };
     const history = [...messages, userMessage];
     
-    // Add user message and a placeholder for the bot's response
     setMessages(prev => [...prev, userMessage, { role: 'assistant', content: '' }]);
-    const botMsgIndex = history.length; // This will be the index of the placeholder in the new array
+    const botMsgIndex = history.length; 
     
     setInput('');
     setIsTyping(true);
@@ -67,17 +101,9 @@ const AICompanion = () => {
             exit={{ opacity: 0, scale: 0.8, y: 20 }}
             className="glass-panel"
             style={{ 
-              position: 'absolute', 
-              bottom: '100%', 
-              right: '0', 
-              marginBottom: '1rem', 
-              width: '350px',
-              height: '450px',
-              border: '1px solid var(--saffron)',
-              display: 'flex',
-              flexDirection: 'column',
-              padding: '1.5rem',
-              background: 'rgba(15, 15, 30, 0.95)'
+              position: 'absolute', bottom: '100%', right: '0', marginBottom: '1rem', 
+              width: '350px', height: '450px', border: '1px solid var(--saffron)',
+              display: 'flex', flexDirection: 'column', padding: '1.5rem', background: 'rgba(15, 15, 30, 0.95)'
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', paddingBottom: '1rem', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
@@ -97,23 +123,19 @@ const AICompanion = () => {
 
             <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1rem' }}>
               {messages.map((msg, i) => (
-                <div key={i} style={{ 
-                  alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
-                  background: msg.role === 'user' ? 'rgba(255, 107, 0, 0.15)' : 'rgba(255, 255, 255, 0.05)',
-                  border: `1px solid ${msg.role === 'user' ? 'rgba(255, 107, 0, 0.3)' : 'rgba(255, 255, 255, 0.1)'}`,
-                  padding: '0.8rem 1rem',
-                  borderRadius: '12px',
-                  maxWidth: '85%',
-                  fontSize: '0.9rem',
-                  lineHeight: '1.4',
-                  whiteSpace: 'pre-wrap'
-                }}>
-                  {msg.content}
-                </div>
+                <div key={i} 
+                  style={{ 
+                    alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                    background: msg.role === 'user' ? 'rgba(255, 107, 0, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+                    border: `1px solid ${msg.role === 'user' ? 'rgba(255, 107, 0, 0.3)' : 'rgba(255, 255, 255, 0.1)'}`,
+                    padding: '0.8rem 1rem', borderRadius: '12px', maxWidth: '85%', fontSize: '0.9rem', lineHeight: '1.4'
+                  }}
+                  dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(msg.content) }}
+                />
               ))}
               {isTyping && (
-                <div style={{ alignSelf: 'flex-start', padding: '0.5rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                  Chunav Saathi is typing...
+                <div style={{ alignSelf: 'flex-start', padding: '0.5rem', fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Loader2 size={12} className="animate-spin" /> Chunav Saathi is typing...
                 </div>
               )}
               <div ref={messagesEndRef} />
@@ -127,85 +149,28 @@ const AICompanion = () => {
                 onKeyPress={(e) => e.key === 'Enter' && handleSend()}
                 placeholder="Ask Chunav Saathi anything..."
                 style={{
-                  flex: 1,
-                  background: 'rgba(0,0,0,0.3)',
-                  border: '1px solid rgba(255,255,255,0.2)',
-                  borderRadius: '8px',
-                  padding: '0.8rem',
-                  color: 'white',
-                  fontFamily: 'inherit',
-                  outline: 'none'
+                  flex: 1, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.2)',
+                  borderRadius: '8px', padding: '0.8rem', color: 'white', fontFamily: 'inherit', outline: 'none'
                 }}
               />
-              <button 
-                onClick={handleSend}
-                style={{
-                  background: 'linear-gradient(135deg, var(--saffron), var(--gold))',
-                  border: 'none',
-                  borderRadius: '8px',
-                  width: '45px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer'
-                }}
-              >
+              <button onClick={handleSend} style={{ background: 'linear-gradient(135deg, var(--saffron), var(--gold))', border: 'none', borderRadius: '8px', width: '45px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
                 <Send size={18} color="black" />
               </button>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
-      <div className="ai-trigger-container" style={{
-        display: 'flex', alignItems: 'center', gap: '15px'
-      }}>
+      <div className="ai-trigger-container" style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
         <AnimatePresence>
           {!isOpen && (
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              style={{
-                background: 'rgba(255, 153, 51, 0.1)',
-                backdropFilter: 'blur(5px)',
-                border: '1px solid rgba(255, 153, 51, 0.3)',
-                padding: '8px 16px',
-                borderRadius: '20px',
-                color: '#FF9933',
-                fontSize: '0.9rem',
-                fontWeight: '600',
-                pointerEvents: 'none',
-                boxShadow: '0 0 15px rgba(255, 153, 51, 0.1)'
-              }}
-            >
+            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} style={{ background: 'rgba(255, 153, 51, 0.1)', backdropFilter: 'blur(5px)', border: '1px solid rgba(255, 153, 51, 0.3)', padding: '8px 16px', borderRadius: '20px', color: '#FF9933', fontSize: '0.9rem', fontWeight: '600', pointerEvents: 'none', boxShadow: '0 0 15px rgba(255, 153, 51, 0.1)' }}>
               Ask Civic AI Guide
             </motion.div>
           )}
         </AnimatePresence>
-        
-        <motion.button
-          whileHover={{ scale: 1.1, rotate: 5 }}
-          whileTap={{ scale: 0.9 }}
-          onClick={() => setIsOpen(!isOpen)}
-          className="glow-pulse"
-          style={{
-            width: '64px', height: '64px', borderRadius: '50%', 
-            background: 'linear-gradient(135deg, #FF9933, #FFD700)', 
-            border: 'none', cursor: 'pointer', display: 'flex', 
-            alignItems: 'center', justifyContent: 'center', 
-            boxShadow: '0 0 30px rgba(255, 153, 51, 0.4)',
-            position: 'relative'
-          }}
-        >
+        <motion.button whileHover={{ scale: 1.1, rotate: 5 }} whileTap={{ scale: 0.9 }} onClick={() => setIsOpen(!isOpen)} className="glow-pulse" style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'linear-gradient(135deg, #FF9933, #FFD700)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 30px rgba(255, 153, 51, 0.4)', position: 'relative' }}>
           <Shield size={32} color="#000" />
-          <motion.div
-            animate={{ scale: [1, 1.4, 1], opacity: [0.3, 0, 0.3] }}
-            transition={{ duration: 2, repeat: Infinity }}
-            style={{
-              position: 'absolute', width: '100%', height: '100%',
-              borderRadius: '50%', border: '2px solid #FF9933', top: 0, left: 0
-            }}
-          />
+          <motion.div animate={{ scale: [1, 1.4, 1], opacity: [0.3, 0, 0.3] }} transition={{ duration: 2, repeat: Infinity }} style={{ position: 'absolute', width: '100%', height: '100%', borderRadius: '50%', border: '2px solid #FF9933', top: 0, left: 0 }} />
         </motion.button>
       </div>
     </div>
@@ -217,9 +182,12 @@ import ErrorBoundary from './components/ErrorBoundary';
 export default function App() {
   return (
     <ErrorBoundary>
-      <ElectionGame />
+      <Suspense fallback={<LoadingScreen />}>
+        <ElectionGame />
+      </Suspense>
       <AICompanion />
     </ErrorBoundary>
   );
 }
+
 

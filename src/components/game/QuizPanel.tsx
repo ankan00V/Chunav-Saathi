@@ -1,5 +1,7 @@
 import React from 'react';
+import DOMPurify from 'dompurify';
 import type { Phase, QuizQuestion } from '../../types/game';
+import { useFocusTrap } from '../../hooks/useFocusTrap';
 
 interface QuizPanelProps {
   currentPhase: Phase;
@@ -30,8 +32,12 @@ const QuizPanel: React.FC<QuizPanelProps> = ({
   onNext,
   onClose
 }) => {
+  const containerRef = useFocusTrap(true);
+  const sanitizedFeedback = feedback ? DOMPurify.sanitize(feedback.text) : '';
+  
   return (
-    <div id="quiz-panel" style={{ display: 'block' }}>
+    <div id="quiz-panel" ref={containerRef} style={{ display: 'block' }} role="dialog" aria-modal="true">
+
       <div className="quiz-header">
         <div className="quiz-phase-badge" style={{ background: currentPhase.bg, color: currentPhase.color, borderColor: currentPhase.color + '50' }}>
           {currentPhase.icon} {currentPhase.name}
@@ -94,21 +100,12 @@ const QuizPanel: React.FC<QuizPanelProps> = ({
                   let btnCls = 'opt-btn';
                   if (answered) {
                     if (i === activeQuiz[qIdx].ans) btnCls += ' correct';
-                    else if (feedback && !feedback.correct && i === activeQuiz[qIdx].ans) {
-                       // Handled by the first condition actually
-                    } else if (feedback && !feedback.correct && i !== activeQuiz[qIdx].ans) {
-                       // This is handled by default class
-                    }
                   }
                   
                   // Refined button classes for better feedback
                   const isCorrect = i === activeQuiz[qIdx].ans;
                   if (answered) {
                     if (isCorrect) btnCls += ' correct';
-                    else if (feedback && !feedback.correct && i === activeQuiz[qIdx].ans) {
-                      // Handled by first condition
-                    }
-
                   }
 
                   return (
@@ -120,8 +117,9 @@ const QuizPanel: React.FC<QuizPanelProps> = ({
                 })}
               </div>
               {feedback && (
-                <div className={`quiz-feedback ${feedback.correct ? 'correct' : 'wrong'}`} style={{ display: 'block' }} dangerouslySetInnerHTML={{ __html: feedback.text }}></div>
+                <div className={`quiz-feedback ${feedback.correct ? 'correct' : 'wrong'}`} style={{ display: 'block' }} dangerouslySetInnerHTML={{ __html: sanitizedFeedback }}></div>
               )}
+
               {answered && (
                 <button className="quiz-next" style={{ display: 'inline-block' }} onClick={onNext}>Next →</button>
               )}
