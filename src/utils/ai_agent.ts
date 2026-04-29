@@ -1,32 +1,20 @@
-import OpenAI from "openai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const getBaseURL = () => {
-  if (typeof window !== "undefined") {
-    return `${window.location.origin}/api/nvidia`;
-  }
-  return "/api/nvidia";
-};
+// Initialize the Gemini API
+const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY || "");
 
-const client = new OpenAI({
-  baseURL: getBaseURL(),
-  apiKey: import.meta.env.VITE_LMA_API_KEY || "",
-  dangerouslyAllowBrowser: true, 
-});
+/**
+ * Message interface for chat history
+ */
+interface ChatMessage {
+  role: "user" | "model" | "system";
+  parts: { text: string }[];
+}
 
-export const streamAIChat = async (
-  message: string,
-  onChunk: (chunk: string) => void,
-  context: any[] = []
-) => {
-  console.log("[AI Agent] Starting chat stream for message:", message.substring(0, 50) + "...");
-  try {
-    const stream = await client.chat.completions.create({
-      model: "meta/llama-3.2-3b-instruct",
-      messages: [
-        {
-          role: "system",
-          content:
-            `You are Chunav Saathi — a vibrant, gamified AI guide built to make India's democratic process feel like an epic adventure. Your world is drenched in the colors of the tricolor.
+/**
+ * System prompt for the AI agent
+ */
+const SYSTEM_PROMPT = `You are Chunav Saathi — a vibrant, gamified AI guide built to make India's democratic process feel like an epic adventure. Your world is drenched in the colors of the tricolor.
 Your mission: walk citizens through the complete Indian election process using interactive quizzes, animated timelines, progress unlocks, and celebratory milestones.
 
 KNOWLEDGE TOPICS TO MASTER AND TEACH:
@@ -47,14 +35,6 @@ GAMIFICATION RULES:
 - Show a visual progress bar through the 6 election phases (Level 1 to Level 6)
 - Offer a Final Challenge Quiz at the end with a shareable Democracy Score
 
-THE 6 LEVELS:
-Level 1 — The Call (Election Announced): ECI powers, Model Code of Conduct, schedule
-Level 2 — Enroll (Become a Voter): Form 6, EPIC card, NVSP portal, eligibility rules
-Level 3 — Battle (Nomination & Campaign): Who can stand, symbols, campaign finance
-Level 4 — Vote Day (Inside the Booth): EVM walkthrough, VVPAT, indelible ink simulator
-Level 5 — Count (Votes Tallied): Counting centers, rounds, majority scenarios
-Level 6 — Victory (Government Formed): Oath-taking, President's role, coalition politics
-
 OUTPUT FORMAT RULES:
 - BE EXTREMELY BRIEF AND CONVERSATIONAL. Never write long paragraphs.
 - If the user says a simple greeting (e.g., "hi", "hello"), reply with ONLY a short, warm greeting and ask what they want to learn. DO NOT dump information.
@@ -64,116 +44,112 @@ OUTPUT FORMAT RULES:
 - Language: primarily English with natural Hindi phrases woven in.
 
 STRICT SPACING TEMPLATE:
-When answering a question, you MUST format your answer EXACTLY like this (notice the blank empty lines between EVERYTHING):
-
+When answering a question, you MUST format your answer EXACTLY like this:
 [Short introductory sentence with emoji]
-
-[Blank Line]
 
 • [Bullet Point 1]
 
-[Blank Line]
-
 • [Bullet Point 2]
-
-[Blank Line]
 
 • [Bullet Point 3]
 
-[Blank Line]
-
 Samjhe nagrik? 😉
 
-Begin every new session with: "Jai Hind! 🇮🇳 Welcome to Chunav Saathi — your ultimate guide to India's greatest festival of democracy! Ready to become a true Chunav Champion? Let's start your journey! 🚀"`
-        },
-        ...context,
-        { role: "user", content: message },
-      ],
-      temperature: 0.2,
-      top_p: 0.7,
-      max_tokens: 1024,
-      stream: true,
+Begin every new session with: "Jai Hind! 🇮🇳 Welcome to Chunav Saathi — your ultimate guide to India's greatest festival of democracy! Ready to become a true Chunav Champion? Let's start your journey! 🚀"`;
+
+/**
+ * Streams AI chat responses using Google Gemini
+ */
+export const streamAIChat = async (
+  message: string,
+  onChunk: (chunk: string) => void,
+  context: any[] = []
+) => {
+  console.log("[AI Agent] Starting Gemini chat stream...");
+  
+  try {
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+    // Transform context to Gemini format
+    const history: any[] = context.map(msg => ({
+      role: msg.role === "user" ? "user" : "model",
+      parts: [{ text: msg.content }]
+    }));
+
+    const chat = model.startChat({
+      history: [
+        { role: "user", parts: [{ text: SYSTEM_PROMPT }] },
+        { role: "model", parts: [{ text: "Understood, nagrik! I am ready to guide India's voters with tricolor energy! 🇮🇳" }] },
+        ...history
+      ]
     });
 
-    for await (const chunk of stream) {
-      if (chunk.choices && chunk.choices.length > 0 && chunk.choices[0]?.delta?.content) {
-        onChunk(chunk.choices[0].delta.content);
-      }
+    const result = await chat.sendMessageStream(message);
+
+    for await (const chunk of result.stream) {
+      const chunkText = chunk.text();
+      onChunk(chunkText);
     }
-    console.log("[AI Agent] Chat stream completed successfully.");
+    
+    console.log("[AI Agent] Gemini stream completed.");
   } catch (error: any) {
-    console.error("[AI Agent] Chat Error:", error);
-    const detail = error?.message || "Check API keys and network connection.";
+    console.error("[AI Agent] Gemini Error:", error);
+    const detail = error?.message || "Check your Gemini API key.";
     onChunk(`\n[Connection to the AI Matrix lost. Details: ${detail}]`);
   }
 };
 
-const quizClient = new OpenAI({
-  apiKey: import.meta.env.VITE_KIMI_API_KEY || "",
-  baseURL: getBaseURL(),
-  dangerouslyAllowBrowser: true,
-});
+/**
+ * Interface for Quiz Question
+ */
+interface QuizQuestion {
+  q: string;
+  opts: string[];
+  ans: number;
+  explain: string;
+}
 
+/**
+ * Generates quiz data using Google Gemini
+ */
 export const generateQuizData = async (
   topic: string,
   onReasoning: (chunk: string) => void
-) => {
-  console.log("[AI Agent] Generating quiz for topic:", topic);
+): Promise<QuizQuestion[]> => {
+  console.log("[AI Agent] Generating quiz via Gemini for:", topic);
+  
   try {
-    const stream = await quizClient.chat.completions.create({
-      model: "meta/llama-3.1-8b-instruct",
-      messages: [
-        { 
-          role: "system", 
-          content: "You are an Indian election quiz generator. Generate exactly 4 multiple choice questions about the provided topic. Return ONLY a valid JSON array of objects. Each object must have: 'q' (the question string with an emoji), 'opts' (an array of 4 option strings), 'ans' (the integer index of the correct option 0-3), and 'explain' (a short explanation string with an emoji). Do not wrap the JSON in markdown code blocks. Output raw JSON only." 
-        },
-        { role: "user", content: `Topic: ${topic}` }
-      ],
-      temperature: 0.3,
-      top_p: 0.9,
-      max_tokens: 2000,
-      stream: true
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-1.5-flash",
+      generationConfig: {
+        responseMimeType: "application/json",
+      }
     });
 
-    let fullContent = "";
-    for await (const chunk of stream) {
-      if (!chunk.choices || chunk.choices.length === 0) continue;
-      
-      const delta = chunk.choices[0]?.delta as any;
-      
-      if (delta?.reasoning_content) {
-        onReasoning(delta.reasoning_content);
-      }
-
-      if (delta?.content) {
-        fullContent += delta.content;
-      }
-    }
-
-    console.log("[AI Agent] Quiz stream completed. Raw length:", fullContent.length);
-
-    // More robust JSON extraction
-    const startIndex = fullContent.indexOf('[');
-    const endIndex = fullContent.lastIndexOf(']') + 1;
+    const prompt = `You are an Indian election quiz generator. Topic: ${topic}. 
+    Generate exactly 4 multiple choice questions.
+    Return a JSON array of objects with these keys: 
+    "q" (string with emoji), 
+    "opts" (array of 4 strings), 
+    "ans" (integer index 0-3), 
+    "explain" (string with emoji).
     
-    if (startIndex === -1 || endIndex === 0) {
-      console.error("[AI Agent] Could not find JSON array in response:", fullContent);
-      throw new Error("Invalid AI response format: No JSON array found.");
-    }
+    Example: [{"q": "❓ Question?", "opts": ["A", "B", "C", "D"], "ans": 0, "explain": "Reasoning 💡"}]`;
 
-    const cleaned = fullContent.substring(startIndex, endIndex);
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
     
-    try {
-      const parsed = JSON.parse(cleaned);
-      console.log("[AI Agent] Quiz data parsed successfully.");
-      return parsed;
-    } catch (e) {
-      console.error("[AI Agent] Failed to parse AI quiz JSON. Cleaned content:", cleaned);
-      throw e;
-    }
+    // Gemini can sometimes wrap JSON in code blocks even with responseMimeType
+    const cleaned = text.replace(/```json/g, "").replace(/```/g, "").trim();
+    const parsed = JSON.parse(cleaned);
+    
+    return parsed;
   } catch (error: any) {
     console.error("[AI Agent] Quiz Generation Error:", error);
-    throw error; // Rethrow to allow component to fallback to static quiz
+    onReasoning("AI is having a momentary glitch... falling back to standard questions.");
+    throw error;
   }
 };
+
 

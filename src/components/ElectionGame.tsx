@@ -131,7 +131,13 @@ const PHASES = [
   }
 ];
 
-const BADGES = [
+interface Badge {
+  emoji: string;
+  label: string;
+  id: string;
+}
+
+const BADGES: Badge[] = [
   { emoji: '⚖️', label: 'ECI Expert', id: 'eci' },
   { emoji: '🗳️', label: 'Registered Voter', id: 'register' },
   { emoji: '📜', label: 'Constitution Champ', id: 'nomination' },
@@ -141,6 +147,7 @@ const BADGES = [
   { emoji: '🔥', label: 'Quiz Master', id: 'quizmaster' },
   { emoji: '🇮🇳', label: 'Democracy Hero', id: 'allclear' },
 ];
+
 
 const RANKS = [
   { min: 0, name: 'Naya Voter 🌱' },
@@ -163,12 +170,24 @@ export default function ElectionGame() {
   const [qIdx, setQIdx] = useState(0);
   const [answered, setAnswered] = useState(false);
   const [feedback, setFeedback] = useState<{ correct: boolean, text: string } | null>(null);
-  const [showCelebration, setShowCelebration] = useState<any>(null);
+  const [showCelebration, setShowCelebration] = useState<(typeof PHASES)[0] | null>(null);
+
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [reasoningText, setReasoningText] = useState<string>("");
-  const [dynamicQuiz, setDynamicQuiz] = useState<any[] | null>(null);
+  const [dynamicQuiz, setDynamicQuiz] = useState<QuizQuestion[] | null>(null);
   const [factIdx, setFactIdx] = useState(0);
+
+  /**
+   * Quiz Question Interface
+   */
+  interface QuizQuestion {
+    q: string;
+    opts: string[];
+    ans: number;
+    explain: string;
+  }
+
 
   // Intersection Observer for reveal effects
   useEffect(() => {
@@ -233,20 +252,21 @@ export default function ElectionGame() {
     return () => clearInterval(interval);
   }, [isGenerating]);
 
+  // Star background state
+  const [stars, setStars] = useState<{ size: number, left: number, top: number, d: number, dl: number }[]>([]);
+
   useEffect(() => {
-    // Generate stars
-    const starsContainer = document.getElementById('stars');
-    if (starsContainer) {
-      starsContainer.innerHTML = '';
-      for (let i = 0; i < 80; i++) {
-        const s = document.createElement('div');
-        s.className = 'star';
-        const size = Math.random() * 2 + 0.5;
-        s.style.cssText = `width:${size}px;height:${size}px;left:${Math.random() * 100}%;top:${Math.random() * 100}%;--d:${2 + Math.random() * 4}s;--dl:${-Math.random() * 4}s;`;
-        starsContainer.appendChild(s);
-      }
-    }
+    // Generate stars data instead of direct DOM manipulation for better efficiency
+    const newStars = Array.from({ length: 80 }).map(() => ({
+      size: Math.random() * 2 + 0.5,
+      left: Math.random() * 100,
+      top: Math.random() * 100,
+      d: 2 + Math.random() * 4,
+      dl: -Math.random() * 4
+    }));
+    setStars(newStars);
   }, []);
+
 
   const currentPhase = PHASES.find(p => p.id === currentPhaseId);
   const rank = [...RANKS].reverse().find(r => dp >= r.min) || RANKS[0];
@@ -365,15 +385,32 @@ export default function ElectionGame() {
           '--d': `${Math.random() * 10 + 15}s`,
           animationDelay: `${Math.random() * 10}s`,
           opacity: Math.random() * 0.5 + 0.1
-        } as any}></div>
+        } as React.CSSProperties}></div>
       ))}
     </div>
   );
 
+
   return (
     <>
       <ParticleField />
-      <div className="stars" id="stars"></div>
+      <div className="stars" id="stars" aria-hidden="true">
+        {stars.map((s, i) => (
+          <div 
+            key={i} 
+            className="star" 
+            style={{ 
+              width: `${s.size}px`, 
+              height: `${s.size}px`, 
+              left: `${s.left}%`, 
+              top: `${s.top}%`, 
+              '--d': `${s.d}s`, 
+              '--dl': `${s.dl}s` 
+            } as any}
+          />
+        ))}
+      </div>
+
 
       {/* SIDE TICKERS - Fixed to edges */}
       <div className="ticker-container left">
@@ -562,29 +599,41 @@ export default function ElectionGame() {
 
         <div className="phases-title" id="phases-grid">🗺️ Choose Your Path</div>
         <div className="journey-path">
-          <div className="phases-grid">
+          <div className="phases-grid" role="list">
             {PHASES.map((p, i) => {
               const done = completed.includes(p.id);
               const locked = i > 0 && !completed.includes(PHASES[i - 1].id) && !done;
               const cls = done ? 'completed' : locked ? 'locked' : 'active';
               return (
-                <div key={p.id} className={`phase-card ${cls}`}
+                <div key={p.id} 
+                  className={`phase-card ${cls}`}
+                  role="button"
+                  aria-disabled={locked}
+                  aria-label={`Level ${i + 1}: ${p.name}. ${done ? 'Completed' : locked ? 'Locked' : 'Available'}`}
+                  tabIndex={locked ? -1 : 0}
                   style={{
                     '--phase-color': p.color, '--phase-bg': p.bg,
                     '--phase-shadow': p.shadow, '--phase-glow': p.glow,
                     animationDelay: `${i * 0.08}s`
                   } as any}
+                  onKeyDown={(e) => {
+                    if ((e.key === 'Enter' || e.key === ' ') && !locked) {
+                      e.preventDefault();
+                      openPhase(p.id);
+                    }
+                  }}
                   onClick={() => !locked && openPhase(p.id)}>
-                  <span className="phase-icon">{p.icon}</span>
+                  <span className="phase-icon" aria-hidden="true">{p.icon}</span>
                   <div className="phase-num" style={{ background: p.bg, color: p.color, borderColor: p.color + '40' }}>{i + 1}</div>
                   <div className="phase-name">{p.name}</div>
                   <div className="phase-desc">{p.info.pills.slice(0, 2).join(' · ')}</div>
-                  {done ? <div className="phase-check">✅</div> : locked ? <div className="phase-lock">🔒</div> : <div className="phase-xp">+{p.xp} XP</div>}
+                  {done ? <div className="phase-check">✅</div> : locked ? <div className="phase-lock" aria-hidden="true">🔒</div> : <div className="phase-xp" aria-label="Experience Points">+{p.xp} XP</div>}
                 </div>
               )
             })}
           </div>
         </div>
+
 
         {activePanel === 'info' && currentPhase && (
           <div id="info-panel" style={{ display: 'block' }}>
