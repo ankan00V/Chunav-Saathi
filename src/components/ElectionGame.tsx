@@ -216,6 +216,7 @@ export default function ElectionGame() {
   const CountUp = ({ end, duration = 2000, suffix = "" }: { end: number, duration?: number, suffix?: string }) => {
     const [count, setCount] = useState(0);
     const countRef = useRef<HTMLDivElement>(null);
+    const [isPulsing, setIsPulsing] = useState(false);
 
     useEffect(() => {
       const observer = new IntersectionObserver(([entry]) => {
@@ -225,17 +226,17 @@ export default function ElectionGame() {
             if (!startTime) startTime = timestamp;
             const progress = Math.min((timestamp - startTime) / duration, 1);
             const currentCount = progress * end;
-            
             setCount(currentCount);
-            
             if (progress < 1) {
               requestAnimationFrame(animate);
+            } else {
+              setIsPulsing(true); // Start the live pulse after initial count
             }
           };
           requestAnimationFrame(animate);
         } else {
-          // Reset when out of view to allow re-animation
           setCount(0);
+          setIsPulsing(false);
         }
       }, { threshold: 0.1 });
 
@@ -243,10 +244,23 @@ export default function ElectionGame() {
       return () => observer.disconnect();
     }, [end, duration]);
 
-    // Format the number: use 1 decimal place if it's a decimal, otherwise none
+    // Continuous Live Pulse Loop
+    useEffect(() => {
+      if (!isPulsing) return;
+      const pulseInterval = setInterval(() => {
+        setCount(prev => {
+          // Subtly drift up and down by 0.05%
+          const drift = (Math.random() - 0.4) * (end * 0.0005);
+          return Math.max(end * 0.99, prev + drift);
+        });
+      }, 2000);
+      return () => clearInterval(pulseInterval);
+    }, [isPulsing, end]);
+
     const formatted = end % 1 === 0 ? Math.floor(count).toLocaleString() : count.toFixed(1);
     return <div ref={countRef}>{formatted}{suffix}</div>;
   };
+
 
 
   useEffect(() => {
