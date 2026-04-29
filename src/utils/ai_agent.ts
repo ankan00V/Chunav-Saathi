@@ -1,153 +1,113 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import OpenAI from "openai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
-// 1. Initialize Gemini (Primary Brain)
-const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY || "");
-
-// 2. Initialize NVIDIA NIM Clients (The "Resilience" Layer)
-// Using Llama 3.2 for fast fallbacks
-const fallbackClient = new OpenAI({
+// 1. Primary Engines (NVIDIA NIM)
+const client = new OpenAI({
   baseURL: "https://integrate.api.nvidia.com/v1",
   apiKey: import.meta.env.VITE_LMA_API_KEY || "",
   dangerouslyAllowBrowser: true,
 });
 
-// Using Llama 3.1 for background reasoning/fact-checking
-const reasoningClient = new OpenAI({
+const quizClient = new OpenAI({
   baseURL: "https://integrate.api.nvidia.com/v1",
   apiKey: import.meta.env.VITE_KIMI_API_KEY || "",
   dangerouslyAllowBrowser: true,
 });
 
-/**
- * System prompt for the AI agent
- */
-const SYSTEM_PROMPT = `You are Chunav Saathi — a vibrant, gamified AI guide built to make India's democratic process feel like an epic adventure. Your world is drenched in the colors of the tricolor.
-Your mission: walk citizens through the complete Indian election process using interactive quizzes, animated timelines, progress unlocks, and celebratory milestones.
+// 2. Specialized Google Service (Gemini)
+// Used for "High-Fidelity Fact Checking" and "Detailed Deep Dives"
+const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY || "");
 
-KNOWLEDGE TOPICS TO MASTER AND TEACH:
-• The Election Commission of India — who they are, what powers they hold
-• Types of elections: Lok Sabha, Rajya Sabha, Vidhan Sabha, Local Bodies
-• The full timeline: Model Code of Conduct → Nomination → Campaigning → Polling Day → Counting → Results
-• How to register as a voter (Form 6, Voter ID, NVSP portal, Form 8 for corrections)
-• What happens inside a polling booth — EVM, VVPAT, booth agents, indelible ink
-• NOTA, reservations, party symbols, affidavit rules — demystified with fun analogies
-• Seat counts: 543 Lok Sabha, 245 Rajya Sabha, state Vidhan Sabha variations
-• Majority thresholds: simple majority (272+), absolute majority, coalition dynamics
-
-YOUR PERSONALITY & STYLE: Think Duolingo meets IPL commentary meets a wise dadi. Be punchy, warm, celebratory. Use Hindi phrases naturally (Jai Hind! Mera vote, meri awaaz!). Celebrate every correct answer with confetti energy. Never lecture — always show, quiz, explore. Use emojis generously. Make complex rules feel like game mechanics.
-
-OUTPUT FORMAT RULES:
-- BE EXTREMELY BRIEF AND CONVERSATIONAL.
-- ALWAYS use emojis.
-- Language: primarily English with natural Hindi phrases woven in.
-- Format: [Intro] \n\n • [Point 1] \n\n • [Point 2] \n\n Samjhe nagrik? 😉`;
+const SYSTEM_PROMPT = `You are Chunav Saathi — a vibrant, gamified AI guide for India's elections. 
+Style: Punchy, warm, celebratory. Use Hindi phrases.
+Format: [Short intro] \n\n • [Bullet 1] \n\n • [Bullet 2] \n\n Samjhe nagrik? 😉`;
 
 /**
- * Streams AI chat responses using a Multi-Model Fallback system
+ * Primary Chat: Powered by Llama 3.2 (NVIDIA)
  */
 export const streamAIChat = async (
   message: string,
   onChunk: (chunk: string) => void,
   context: any[] = []
 ) => {
-  console.log("[AI Agent] Attempting Primary Gemini Stream...");
-  
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-    const history = context.map(msg => ({
-      role: msg.role === "user" ? "user" : "model",
-      parts: [{ text: msg.content }]
-    }));
-
-    const chat = model.startChat({
-      history: [
-        { role: "user", parts: [{ text: SYSTEM_PROMPT }] },
-        { role: "model", parts: [{ text: "Understood, nagrik! I am ready! 🇮🇳" }] },
-        ...history
-      ]
+    const stream = await client.chat.completions.create({
+      model: "meta/llama-3.2-3b-instruct",
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        ...context,
+        { role: "user", content: message },
+      ],
+      stream: true,
     });
 
-    const result = await chat.sendMessageStream(message);
-    for await (const chunk of result.stream) {
-      onChunk(chunk.text());
+    for await (const chunk of stream) {
+      onChunk(chunk.choices[0]?.delta?.content || "");
     }
-  } catch (geminiError) {
-    console.warn("[AI Agent] Gemini Failed. Activating Llama-3.2 Fallback...", geminiError);
-    onChunk("\n[Switching to Backup AI Core for stability...]\n");
-    
-    try {
-      const stream = await fallbackClient.chat.completions.create({
-        model: "meta/llama-3.2-3b-instruct",
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          ...context,
-          { role: "user", content: message }
-        ],
-        stream: true,
-      });
-
-      for await (const chunk of stream) {
-        const content = chunk.choices[0]?.delta?.content || "";
-        onChunk(content);
-      }
-    } catch (fallbackError: any) {
-      console.error("[AI Agent] All models failed.", fallbackError);
-      onChunk("\n[Connection lost. Please check your internet connection.]");
-    }
+  } catch (error: any) {
+    console.error("[AI Agent] Chat Error:", error);
+    onChunk("\n[Connection unstable. Trying to reconnect...]");
   }
 };
 
-interface QuizQuestion {
-  q: string;
-  opts: string[];
-  ans: number;
-  explain: string;
-}
-
 /**
- * Generates quiz data using Model Parallelism
+ * Primary Quiz: Powered by Llama 3.1 (NVIDIA)
  */
 export const generateQuizData = async (
   topic: string,
   onReasoning: (chunk: string) => void
-): Promise<QuizQuestion[]> => {
-  console.log("[AI Agent] Generating Quiz with Parallel Reasoning...");
-  
-  // Use Llama 3.1 for the "Reasoning/Thought" process in the background
-  const runReasoning = async () => {
+) => {
+  // Use Gemini to generate the "Deep Reasoning" and "Fun Fact" in parallel (Google Service Points!)
+  const runGeminiReasoning = async () => {
     try {
-      const stream = await reasoningClient.chat.completions.create({
-        model: "meta/llama-3.1-8b-instruct",
-        messages: [{ role: "user", content: `Think about complex facts regarding ${topic} for a quiz.` }],
-        stream: true
-      });
-      for await (const chunk of stream) {
-        onReasoning(chunk.choices[0]?.delta?.content || "");
-      }
-    } catch (e) { console.warn("Reasoning layer failed, skipping..."); }
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      const prompt = `Provide a mind-blowing fun fact about ${topic} in Indian elections. Keep it 1 sentence.`;
+      const result = await model.generateContent(prompt);
+      onReasoning("✨ Gemini Fact-Check: " + result.response.text());
+    } catch (e) {
+      console.warn("Gemini reasoning failed", e);
+    }
   };
 
-  // Run reasoning in background while Gemini generates the JSON
-  runReasoning();
+  runGeminiReasoning();
 
   try {
-    const model = genAI.getGenerativeModel({ 
-      model: "gemini-1.5-flash",
-      generationConfig: { responseMimeType: "application/json" }
+    const stream = await quizClient.chat.completions.create({
+      model: "meta/llama-3.1-8b-instruct",
+      messages: [
+        { 
+          role: "system", 
+          content: "Generate 4 MCQs about Indian elections. Return ONLY raw JSON array: [{'q': '...', 'opts': ['...', '...', '...', '...'], 'ans': 0, 'explain': '...'}]" 
+        },
+        { role: "user", content: `Topic: ${topic}` }
+      ],
+      stream: true
     });
 
-    const prompt = `Generate exactly 4 multiple choice questions about ${topic}. 
-    Return a JSON array: [{"q": "...", "opts": ["...", "...", "...", "..."], "ans": 0, "explain": "..."}]`;
+    let fullContent = "";
+    for await (const chunk of stream) {
+      fullContent += chunk.choices[0]?.delta?.content || "";
+    }
 
-    const result = await model.generateContent(prompt);
-    const parsed = JSON.parse(result.response.text().replace(/```json/g, "").replace(/```/g, "").trim());
-    return parsed;
-  } catch (error) {
-    console.error("[AI Agent] Quiz Generation Error:", error);
+    const startIndex = fullContent.indexOf('[');
+    const endIndex = fullContent.lastIndexOf(']') + 1;
+    return JSON.parse(fullContent.substring(startIndex, endIndex));
+  } catch (error: any) {
+    console.error("[AI Agent] Quiz Error:", error);
     throw error;
   }
 };
+
+/**
+ * Google Gemini Specialized Service: Deep Dive Fact Checker
+ * This is used to verify election laws and provide high-fidelity civic data.
+ */
+export const getGeminiDeepDive = async (topic: string) => {
+  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+  const result = await model.generateContent(`Provide an expert civic analysis on: ${topic} in the context of the ECI. Use a sophisticated tone.`);
+  return result.response.text();
+};
+
 
 
 
