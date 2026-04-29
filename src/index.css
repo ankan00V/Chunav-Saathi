@@ -10,25 +10,36 @@
   --card2:#1A0F2E;
   --border:rgba(255,255,255,0.08);
   --text-muted:rgba(255,255,255,0.5);
+  --gemini-blue: #4285F4;
 }
 
 html,body{
   background:var(--bg);
   color:#fff;
-  font-family:'Nunito',sans-serif;
+  font-family:'Outfit', sans-serif;
   min-height:100vh;
   overflow-x:hidden;
 }
 
-/* ---- BACKGROUND ---- */
+/* ---- PREMIUM NEBULA BACKGROUND ---- */
 body::before{
   content:'';
   position:fixed;inset:0;z-index:0;
   background:
-    radial-gradient(ellipse 60% 40% at 15% 20%, rgba(255,107,0,0.12) 0%, transparent 60%),
-    radial-gradient(ellipse 50% 35% at 85% 70%, rgba(11,138,60,0.12) 0%, transparent 55%),
-    radial-gradient(ellipse 40% 30% at 50% 50%, rgba(0,48,135,0.1) 0%, transparent 60%);
+    radial-gradient(ellipse 60% 40% at 15% 20%, rgba(255,107,0,0.08) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 35% at 85% 70%, rgba(11,138,60,0.08) 0%, transparent 55%),
+    radial-gradient(ellipse 40% 30% at 50% 50%, rgba(66, 133, 244, 0.05) 0%, transparent 60%);
   pointer-events:none;
+  animation: nebula-pulse 15s infinite alternate ease-in-out;
+}
+
+@keyframes nebula-pulse {
+  from { opacity: 0.7; transform: scale(1); }
+  to { opacity: 1; transform: scale(1.05); }
+}
+
+h1, h2, h3, h4, .nav-logo, .phases-title, .info-title, .quiz-q {
+  font-family: 'Baloo 2', cursive !important;
 }
 
 /* Stars */
@@ -561,23 +572,7 @@ body::before{
   min-height: 100vh;
 }
 
-/* --- CINEMATIC NEBULA BACKGROUND --- */
-body::before {
-  content: '';
-  position: fixed;
-  top: 0; left: 0; width: 100%; height: 100%;
-  background: 
-    radial-gradient(circle at 20% 30%, rgba(255, 153, 51, 0.05) 0%, transparent 40%),
-    radial-gradient(circle at 80% 70%, rgba(19, 136, 8, 0.05) 0%, transparent 40%),
-    radial-gradient(circle at 50% 50%, rgba(0, 119, 255, 0.03) 0%, transparent 60%);
-  z-index: -1;
-  animation: nebulaFloat 20s ease-in-out infinite alternate;
-}
-
-@keyframes nebulaFloat {
-  0% { transform: scale(1) translate(0, 0); }
-  100% { transform: scale(1.1) translate(-2%, -2%); }
-}
+/* --- PREMIUM NEBULA BACKGROUND MOVED TO ROOT --- */
 
 .reveal-on-scroll {
   opacity: 0;

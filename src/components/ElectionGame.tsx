@@ -905,8 +905,12 @@ export default function ElectionGame() {
             Combating voter apathy by gamifying civic education. Experience the journey of democracy from voter registration to government formation.
             Built for the <strong>India's Civic Adventure</strong> hackathon.
           </p>
-          <div style={{ marginTop: '40px', color: '#444', fontSize: '0.8rem' }}>
-            © 2026 Chunav Saathi. "Every Vote is a Voice, Every Voice is a Superpower." 🇮🇳
+          <div style={{ marginTop: '40px', color: '#444', fontSize: '0.8rem', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', color: '#666' }}>
+              <img src="https://www.gstatic.com/lamda/images/gemini_sparkle_v002_d4735304ff6298a2f2444.svg" width="14" alt="" />
+              <span>Intelligent Deep-Dives Powered by <strong>Google Gemini 1.5 Flash</strong></span>
+            </div>
+            <div>© 2026 Chunav Saathi. "Every Vote is a Voice, Every Voice is a Superpower." 🇮🇳</div>
           </div>
         </div>
       </footer>
