@@ -19,6 +19,26 @@ vi.mock('@google/generative-ai', () => ({
   }
 }));
 
+// Mock OpenAI
+vi.mock('openai', () => {
+  return {
+    default: class {
+      chat = {
+        completions: {
+          create: vi.fn().mockResolvedValue({
+            choices: [{ delta: { content: 'Jai Hind!' } }],
+            [Symbol.asyncIterator]: async function* () {
+              yield { choices: [{ delta: { content: 'Jai Hind!' } }] };
+              yield { choices: [{ delta: { content: ' Welcome to Chunav Saathi!' } }] };
+            }
+          })
+        }
+      }
+    }
+  };
+});
+
+
 describe('AI Agent', () => {
   it('should stream AI chat chunks', async () => {
     const onChunk = vi.fn();

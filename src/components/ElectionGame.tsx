@@ -1,13 +1,60 @@
-import { useState, useEffect, useRef } from 'react';
-import { generateQuizData } from '../utils/ai_agent';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import CountUp from './ui/CountUp';
+import ParticleField from './ui/ParticleField';
+import { generateQuizData, getGeminiDeepDive } from '../utils/ai_agent';
 import '../index.css';
 
-// ---- DATA ----
-const PHASES = [
+/**
+ * UI Interfaces
+ */
+interface Badge {
+  emoji: string;
+  label: string;
+  id: string;
+}
+
+interface QuizQuestion {
+  q: string;
+  opts: string[];
+  ans: number;
+  explain: string;
+}
+
+interface PhaseInfo {
+  pills: string[];
+  body: string;
+  steps?: { title: string; desc: string }[];
+}
+
+interface Phase {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
+  bg: string;
+  shadow: string;
+  glow: string;
+  xp: number;
+  info: PhaseInfo;
+  badge: Badge;
+  quiz: QuizQuestion[];
+}
+
+const BADGES: Badge[] = [
+  { emoji: '⚖️', label: 'ECI Expert', id: 'eci' },
+  { emoji: '🗳️', label: 'Registered Voter', id: 'register' },
+  { emoji: '📜', label: 'Constitution Champ', id: 'nomination' },
+  { emoji: '🏛️', label: 'Lok Sabha Legend', id: 'polling' },
+  { emoji: '📊', label: 'NOTA Ninja', id: 'counting' },
+  { emoji: '🌟', label: 'Chunav Champion', id: 'govt' },
+  { emoji: '🔥', label: 'Quiz Master', id: 'quizmaster' },
+  { emoji: '🇮🇳', label: 'Democracy Hero', id: 'allclear' },
+];
+const PHASES: Phase[] = [
   {
     id: 'eci', name: 'ECI — The Guardians', icon: '⚖️', xp: 150,
     color: '#FF6B00', bg: 'rgba(255,107,0,0.15)', shadow: 'rgba(255,107,0,0.25)', glow: 'rgba(255,107,0,0.12)',
-    badge: { emoji: '⚖️', label: 'ECI Expert' },
+    badge: { emoji: '⚖️', label: 'ECI Expert', id: 'eci' },
     info: {
       body: `The <strong>Election Commission of India (ECI)</strong> is a constitutional body that runs all elections in India. Founded in <strong>1950</strong>, it is completely independent of the government — no minister can give it orders!\n\nThe ECI announces election dates, enforces the <strong>Model Code of Conduct (MCC)</strong> once elections are declared, transfers officials who are biased, and can even cancel elections in case of violence. The MCC kicks in the moment elections are announced and freezes government announcements of new schemes.`,
       pills: ['Founded: Jan 25, 1950', 'Article 324 of Constitution', '3 Commissioners', 'Model Code of Conduct', 'CEC Cannot Be Removed Easily'],
@@ -27,7 +74,7 @@ const PHASES = [
   {
     id: 'register', name: 'Voter Registration', icon: '📋', xp: 150,
     color: '#FFB800', bg: 'rgba(255,184,0,0.15)', shadow: 'rgba(255,184,0,0.25)', glow: 'rgba(255,184,0,0.12)',
-    badge: { emoji: '🗳️', label: 'Registered Voter' },
+    badge: { emoji: '🗳️', label: 'Registered Voter', id: 'register' },
     info: {
       body: `To vote in India, you must be on the <strong>Electoral Roll</strong>. You register using <strong>Form 6</strong> on the NVSP portal (nvsp.in) or the Voter Helpline App. You need to be <strong>18 years old</strong> on the qualifying date (January 1st of the year).\n\nOnce registered, you get an <strong>Elector Photo Identity Card (EPIC)</strong> — your Voter ID! If you move, file <strong>Form 8</strong> to update your address. You can also vote without a Voter ID using 12 alternative IDs like Aadhaar, PAN card, or passport.`,
       pills: ['Age: 18+', 'Form 6: New Registration', 'Form 8: Address Change', 'NVSP Portal', 'EPIC (Voter ID Card)', '12 Alternate ID Proofs'],
@@ -48,7 +95,7 @@ const PHASES = [
   {
     id: 'nomination', name: 'Nomination & Campaign', icon: '🎤', xp: 150,
     color: '#FF7EB9', bg: 'rgba(255,126,185,0.15)', shadow: 'rgba(255,126,185,0.25)', glow: 'rgba(255,126,185,0.12)',
-    badge: { emoji: '📜', label: 'Constitution Champ' },
+    badge: { emoji: '📜', label: 'Constitution Champ', id: 'nomination' },
     info: {
       body: `To contest a Lok Sabha election, a candidate must be a <strong>citizen of India, at least 25 years old</strong>, and mentally sound. They file a <strong>nomination paper</strong> with the Returning Officer along with a <strong>security deposit (₹25,000</strong> for general seats).\n\nCandidates must submit an <strong>affidavit</strong> declaring criminal records, assets, and education. Party candidates get their party's <strong>election symbol</strong> (like BJP's Lotus or Congress's Hand). Independents get a symbol from the ECI's free list. Campaign spending limits: <strong>₹95 lakh</strong> per Lok Sabha constituency!`,
       pills: ['Age: Min 25 (Lok Sabha)', 'Security Deposit: ₹25,000', 'Affidavit: Criminal & Assets', 'Campaign Limit: ₹95 Lakh', 'Model Code of Conduct', 'NOTA: "None of the Above"'],
@@ -69,7 +116,7 @@ const PHASES = [
   {
     id: 'polling', name: 'Polling Day', icon: '🗳️', xp: 200,
     color: '#4BDB85', bg: 'rgba(75,219,133,0.12)', shadow: 'rgba(75,219,133,0.2)', glow: 'rgba(75,219,133,0.1)',
-    badge: { emoji: '🏛️', label: 'Lok Sabha Legend' },
+    badge: { emoji: '🏛️', label: 'Lok Sabha Legend', id: 'polling' },
     info: {
       body: `On polling day, you visit your assigned <strong>polling booth</strong> with your Voter ID (or any of 12 alternate IDs). Your name is verified in the electoral roll. You then vote on an <strong>Electronic Voting Machine (EVM)</strong> — a tamper-proof device used since 2004 in all Indian elections.\n\nAfter pressing your candidate's button, a paper slip prints in the <strong>VVPAT (Voter Verifiable Paper Audit Trail)</strong> machine so you can verify your vote was registered correctly. Your left index finger is marked with <strong>indelible ink</strong> that lasts 2-3 weeks!`,
       pills: ['EVM: Electronic Voting Machine', 'VVPAT: Paper Audit Trail', 'Indelible Ink: Left Index Finger', '543 Lok Sabha Constituencies', 'Booth Agents: Party Representatives', 'Presiding Officer: In Charge'],
@@ -90,7 +137,7 @@ const PHASES = [
   {
     id: 'counting', name: 'Vote Counting', icon: '📊', xp: 150,
     color: '#6EC6FF', bg: 'rgba(110,198,255,0.12)', shadow: 'rgba(110,198,255,0.2)', glow: 'rgba(110,198,255,0.1)',
-    badge: { emoji: '📊', label: 'NOTA Ninja' },
+    badge: { emoji: '📊', label: 'NOTA Ninja', id: 'counting' },
     info: {
       body: `Counting happens at designated <strong>Counting Centres</strong>, usually on a date announced by ECI after polling. EVMs are brought from strong rooms under heavy security. Counting agents of all parties are present.\n\nVotes are counted <strong>round by round</strong> for each polling station. Results stream in real-time on the ECI Results portal. A party needs <strong>272 seats</strong> (simple majority) to form the government alone. If no party reaches this, coalition negotiations begin — called a <strong>Hung Parliament</strong>!`,
       pills: ['272 seats = Simple Majority', '543 Total Lok Sabha Seats', 'Strong Room: EVM Storage', 'Round-by-Round Counting', 'Hung Parliament: No Majority', 'President Invites Largest Party'],
@@ -111,7 +158,7 @@ const PHASES = [
   {
     id: 'govt', name: 'Government is Formed', icon: '🌟', xp: 200,
     color: '#C882FF', bg: 'rgba(200,130,255,0.12)', shadow: 'rgba(200,130,255,0.2)', glow: 'rgba(200,130,255,0.1)',
-    badge: { emoji: '🌟', label: 'Chunav Champion' },
+    badge: { emoji: '🌟', label: 'Chunav Champion', id: 'govt' },
     info: {
       body: `Once a party proves majority (via floor test or letter of support), the <strong>President of India</strong> invites its leader to become the <strong>Prime Minister</strong>. The PM then selects the <strong>Council of Ministers</strong> (Cabinet).\n\nThe oath is taken at <strong>Rashtrapati Bhavan</strong>. The President administers the oath of office and secrecy. After oath-taking, the new government must present itself for a <strong>vote of confidence</strong> in Lok Sabha within 30 days. The term of the government is <strong>5 years</strong>, unless it loses majority earlier!`,
       pills: ['PM Invited by President', 'Oath at Rashtrapati Bhavan', 'Council of Ministers (Cabinet)', 'Vote of Confidence: 30 days', 'Government Term: 5 Years', 'President: Constitutional Head'],
@@ -130,24 +177,6 @@ const PHASES = [
     ]
   }
 ];
-
-interface Badge {
-  emoji: string;
-  label: string;
-  id: string;
-}
-
-const BADGES: Badge[] = [
-  { emoji: '⚖️', label: 'ECI Expert', id: 'eci' },
-  { emoji: '🗳️', label: 'Registered Voter', id: 'register' },
-  { emoji: '📜', label: 'Constitution Champ', id: 'nomination' },
-  { emoji: '🏛️', label: 'Lok Sabha Legend', id: 'polling' },
-  { emoji: '📊', label: 'NOTA Ninja', id: 'counting' },
-  { emoji: '🌟', label: 'Chunav Champion', id: 'govt' },
-  { emoji: '🔥', label: 'Quiz Master', id: 'quizmaster' },
-  { emoji: '🇮🇳', label: 'Democracy Hero', id: 'allclear' },
-];
-
 
 const RANKS = [
   { min: 0, name: 'Naya Voter 🌱' },
@@ -170,26 +199,14 @@ export default function ElectionGame() {
   const [qIdx, setQIdx] = useState(0);
   const [answered, setAnswered] = useState(false);
   const [feedback, setFeedback] = useState<{ correct: boolean, text: string } | null>(null);
-  const [showCelebration, setShowCelebration] = useState<(typeof PHASES)[0] | null>(null);
-
+  const [showCelebration, setShowCelebration] = useState<Phase | null>(null);
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [reasoningText, setReasoningText] = useState<string>("");
   const [dynamicQuiz, setDynamicQuiz] = useState<QuizQuestion[] | null>(null);
   const [factIdx, setFactIdx] = useState(0);
+  const [deepDiveText, setDeepDiveText] = useState<string | null>(null);
 
-  /**
-   * Quiz Question Interface
-   */
-  interface QuizQuestion {
-    q: string;
-    opts: string[];
-    ans: number;
-    explain: string;
-  }
-
-
-  // Intersection Observer for reveal effects
   useEffect(() => {
     const observer = new IntersectionObserver((entries) => {
       entries.forEach(entry => {
@@ -203,63 +220,13 @@ export default function ElectionGame() {
     return () => observer.disconnect();
   }, []);
 
-  const FUN_FACTS = [
+  const FUN_FACTS = useMemo(() => [
     "🗳️ Did you know? India's first election took 4 months to complete!",
     "🗻 The highest polling station in the world is in Tashigang, Himachal Pradesh, at 15,256 ft!",
-    "🐘 In 1951, the Election Commission used symbols because many voters couldn't read.",
     "🟣 The indelible ink used on your finger is made by only ONE company in Mysore!",
     "📝 NOTA (None of the Above) was introduced in India in 2013.",
     "🏃‍♂️ Election officials once trekked 40km through a jungle just for a single voter in Arunachal Pradesh!"
-  ];
-
-  // SUB-COMPONENT: Count Up Animation
-  const CountUp = ({ end, duration = 2000, suffix = "" }: { end: number, duration?: number, suffix?: string }) => {
-    const [count, setCount] = useState(0);
-    const countRef = useRef<HTMLDivElement>(null);
-    const [isPulsing, setIsPulsing] = useState(false);
-
-    useEffect(() => {
-      const observer = new IntersectionObserver(([entry]) => {
-        if (entry.isIntersecting) {
-          let startTime: number | null = null;
-          const animate = (timestamp: number) => {
-            if (!startTime) startTime = timestamp;
-            const progress = Math.min((timestamp - startTime) / duration, 1);
-            const currentCount = progress * end;
-            setCount(currentCount);
-            if (progress < 1) {
-              requestAnimationFrame(animate);
-            } else {
-              setIsPulsing(true); // Start the live pulse after initial count
-            }
-          };
-          requestAnimationFrame(animate);
-        } else {
-          setCount(0);
-          setIsPulsing(false);
-        }
-      }, { threshold: 0.1 });
-
-      if (countRef.current) observer.observe(countRef.current);
-      return () => observer.disconnect();
-    }, [end, duration]);
-
-    // Continuous Live Pulse Loop
-    useEffect(() => {
-      if (!isPulsing) return;
-      const pulseInterval = setInterval(() => {
-        setCount(prev => {
-          // Subtly drift up and down by 0.05%
-          const drift = (Math.random() - 0.4) * (end * 0.0005);
-          return Math.max(end * 0.99, prev + drift);
-        });
-      }, 2000);
-      return () => clearInterval(pulseInterval);
-    }, [isPulsing, end]);
-
-    const formatted = end % 1 === 0 ? Math.floor(count).toLocaleString() : count.toFixed(1);
-    return <div ref={countRef}>{formatted}{suffix}</div>;
-  };
+  ], []);
 
 
 
@@ -297,11 +264,22 @@ export default function ElectionGame() {
     setTimeout(() => openPhase('eci'), 400);
   };
 
-  const openPhase = (id: string) => {
+  const openPhase = useCallback(async (id: string) => {
     setCurrentPhaseId(id);
     setActivePanel('info');
+    setDeepDiveText(null); // Reset deep dive for new phase
+    
+    // Trigger Google Gemini Deep Dive in background
+    const phase = PHASES.find(p => p.id === id);
+    if (phase) {
+      try {
+        const dive = await getGeminiDeepDive(phase.name);
+        setDeepDiveText(dive);
+      } catch (e) { console.error("Deep dive failed", e); }
+    }
     document.getElementById('info-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
+  }, []);
+
 
   const startQuiz = async () => {
     setActivePanel('quiz');
@@ -395,25 +373,11 @@ export default function ElectionGame() {
     document.getElementById('phases-grid')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
 
-  // SUB-COMPONENT: Particle Field for atmosphere
-  const ParticleField = () => (
-    <div className="particle-field">
-      {[...Array(25)].map((_, i) => (
-        <div key={i} className="particle" style={{
-          left: `${Math.random() * 100}%`,
-          width: `${Math.random() * 3 + 1}px`,
-          height: `${Math.random() * 3 + 1}px`,
-          '--d': `${Math.random() * 10 + 15}s`,
-          animationDelay: `${Math.random() * 10}s`,
-          opacity: Math.random() * 0.5 + 0.1
-        } as React.CSSProperties}></div>
-      ))}
-    </div>
-  );
-
-
   return (
-    <>
+    <main id="main-content">
+      <a href="#phases-grid" className="skip-link" style={{ position: 'absolute', left: '-9999px', top: '20px', background: 'var(--saffron)', color: 'white', padding: '10px 20px', zIndex: 9999, borderRadius: '8px' }}>
+        Skip to Journey Map
+      </a>
       <ParticleField />
       <div className="stars" id="stars" aria-hidden="true">
         {stars.map((s, i) => (
@@ -434,7 +398,7 @@ export default function ElectionGame() {
 
 
       {/* SIDE TICKERS - Fixed to edges */}
-      <div className="ticker-container left">
+      <aside className="ticker-container left" aria-hidden="true">
         <div className="ticker-track down">
           {[...Array(2)].map((_, i) => (
             <div key={i} className="ticker-content">
@@ -449,9 +413,9 @@ export default function ElectionGame() {
             </div>
           ))}
         </div>
-      </div>
+      </aside>
 
-      <div className="ticker-container right">
+      <aside className="ticker-container right" aria-hidden="true">
         <div className="ticker-track up">
           {[...Array(2)].map((_, i) => (
             <div key={i} className="ticker-content">
@@ -466,10 +430,10 @@ export default function ElectionGame() {
             </div>
           ))}
         </div>
-      </div>
+      </aside>
 
       <div className="app">
-        <nav className="nav">
+        <header className="nav">
           <div className="nav-logo">
             चुनाव साथी
             <span>Chunav Saathi</span>
@@ -477,11 +441,11 @@ export default function ElectionGame() {
           <div className="nav-right">
             <div className="xp-pill">🏆 <span>{xp}</span> XP</div>
           </div>
-        </nav>
+        </header>
 
-        <div className="flag-strip"></div>
+        <div className="flag-strip" aria-hidden="true"></div>
 
-        <div className="hero">
+        <section className="hero">
           {/* Immersive Ambient Orbs for the "Metaverse" feel */}
           <div className="ambient-orb orb-1"></div>
           <div className="ambient-orb orb-2"></div>
@@ -523,13 +487,13 @@ export default function ElectionGame() {
           >
             <span className="icon" aria-hidden="true">▶</span> Begin Your Quest
           </button>
-        </div>
+        </section>
 
         {/* CHAMPION STAT ORBS (REVEAL) - UPDATED FOR 2026 SCALE */}
-        <div className="reveal-on-scroll" style={{
+        <section className="reveal-on-scroll" style={{
           display: 'flex', justifyContent: 'center', gap: '30px', padding: '50px 20px',
           flexWrap: 'wrap'
-        }}>
+        }} aria-label="Electoral Statistics">
           <div className="stat-orb" style={{ '--orb-color': '#FF9933', '--orb-glow': 'rgba(255,153,51,0.3)' } as any}>
             <div style={{ fontSize: '2.5rem', fontWeight: 'bold', color: '#FF9933', marginBottom: '8px' }}>
               <CountUp end={1000} suffix="M+" />
@@ -550,7 +514,7 @@ export default function ElectionGame() {
             </div>
             <div style={{ fontSize: '0.8rem', color: '#888', textTransform: 'uppercase', letterSpacing: '2px', fontWeight: '600' }}>Gen-Z First-Timers</div>
           </div>
-        </div>
+        </section>
 
         <div className="score-box">
           <div className="score-left">
@@ -669,12 +633,33 @@ export default function ElectionGame() {
             </div>
             <div className="info-body" dangerouslySetInnerHTML={{ __html: currentPhase.info.body.replace(/\n/g, '<br><br>') }}></div>
 
+            {/* Google Service Integration: Gemini Deep Dive */}
+            {deepDiveText ? (
+              <div className="reveal-on-scroll" style={{ 
+                marginTop: '30px', 
+                padding: '20px', 
+                background: 'rgba(66,133,244,0.05)', 
+                border: '1px solid rgba(66,133,244,0.2)', 
+                borderRadius: '15px' 
+              }}>
+                <div style={{ color: '#4285F4', fontSize: '0.7rem', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <img src="https://www.gstatic.com/lamda/images/gemini_sparkle_v002_d4735304ff6298a2f2444.svg" width="16" alt="" />
+                  Gemini Expert Deep-Dive
+                </div>
+                <p style={{ fontSize: '0.9rem', color: '#ccc', lineHeight: '1.6', fontStyle: 'italic' }}>{deepDiveText}</p>
+              </div>
+            ) : (
+              <div style={{ marginTop: '30px', padding: '15px', color: '#666', fontSize: '0.8rem', textAlign: 'center' }}>
+                Consulting Gemini for expert analysis...
+              </div>
+            )}
+
             {/* Timeline Steps */}
             {currentPhase.info.steps && (
               <div className="phase-timeline">
                 <h4 className="timeline-header">Timeline & Steps</h4>
                 <div className="timeline-track">
-                  {currentPhase.info.steps.map((step: any, idx: number) => (
+                  {currentPhase.info.steps.map((step: { title: string; desc: string }, idx: number) => (
                     <div key={idx} className="timeline-step">
                       <div className="timeline-dot" style={{ borderColor: currentPhase.color, background: currentPhase.bg }}></div>
                       <div className="timeline-content">
@@ -925,6 +910,6 @@ export default function ElectionGame() {
           </div>
         </div>
       </footer>
-    </>
+    </main>
   );
 }
