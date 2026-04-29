@@ -1,7 +1,14 @@
 import OpenAI from "openai";
 
+const getBaseURL = () => {
+  if (typeof window !== "undefined") {
+    return `${window.location.origin}/api/nvidia`;
+  }
+  return "/api/nvidia";
+};
+
 const client = new OpenAI({
-  baseURL: "/api/nvidia",
+  baseURL: getBaseURL(),
   apiKey: import.meta.env.VITE_LMA_API_KEY || "",
   dangerouslyAllowBrowser: true, 
 });
@@ -103,7 +110,7 @@ Begin every new session with: "Jai Hind! 🇮🇳 Welcome to Chunav Saathi — y
 
 const quizClient = new OpenAI({
   apiKey: import.meta.env.VITE_KIMI_API_KEY || "",
-  baseURL: "/api/nvidia",
+  baseURL: getBaseURL(),
   dangerouslyAllowBrowser: true,
 });
 
