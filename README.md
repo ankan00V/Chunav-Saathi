@@ -1,52 +1,71 @@
-# 🗳️ Chunav Saathi Metaverse
-### *Master India's Democracy in 3D*
+# 🗳️ Chunav Saathi (चुनाव साथी)
+### The Indian Election Metaverse Experience
 
-**Chunav Saathi** is an immersive, gamified civic education platform designed to combat voter apathy among India's youth. By transforming the complex processes of the Election Commission of India (ECI) into a 3D "Metaverse" experience, we make civic duty an epic quest.
+**Chunav Saathi** is an immersive, gamified civic education platform designed to combat voter apathy in India. It transforms the complex journey of democracy into a 3D metaverse adventure, empowering citizens with the knowledge to become "Democracy Heroes."
 
 ---
 
-## 🏛️ Project Details
-- **Chosen Vertical**: Civic Education & Government Services
-- **Target Audience**: 18.5 Million+ First-time Voters (Youth)
-- **Problem Statement**: Bridging the gap between dry civic information and actual voter participation.
+## 🏛️ Challenge Vertical: Civic & Government
+Our solution focuses on the **Civic Education & Voter Engagement** persona. It targets first-time voters (Gen-Z) and citizens seeking a deeper, more engaging way to understand the ECI (Election Commission of India) framework.
 
 ---
 
 ## 🧠 Approach & Logic
-Our approach is based on the **"Experiential Learning"** model. Instead of reading about democracy, users live it through a 6-phase journey:
-1.  **Logical Progression**: The game mirrors the real-world ECI workflow: *Guardians (ECI) → Registration → Campaign → Polling → Counting → Formation.*
-2.  **State Management**: Built with React, the application tracks `XP` (Experience) and `DP` (Democracy Points) across levels, ensuring a persistence of learning.
-3.  **Visual Hierarchy**: Uses 3D architectural anchors as milestones to ground the abstract concepts of law and governance in tangible cultural pride.
+
+### 1. Hybrid AI Architecture (NVIDIA + Google)
+To balance lightning-fast response times with high-fidelity civic accuracy, we implemented a hybrid model router:
+- **NVIDIA NIM (Llama 3.2 3B):** Powers the core "Chunav Saathi" chat guide for instant, punchy conversational responses.
+- **NVIDIA NIM (Llama 3.1 8B):** Generates dynamic, topic-specific MCQs for the gamified learning path.
+- **Google Gemini 1.5 Flash:** Acts as the **Specialized High-Fidelity Fact-Checker**. It provides "Expert Deep-Dives" on complex constitutional topics, ensuring the highest reliability for sensitive civic information.
+
+### 2. Gamified Progression Logic
+The app uses a 6-phase "Civic Quest":
+- **ECI Guardians** → **Registration** → **Nomination** → **Polling** → **Counting** → **Government Formation**.
+- Users earn **XP (Experience Points)** and unlock **Badges** for each mastered level.
+- **Dynamic Quiz Generation:** Unlike static apps, our AI generates custom quizzes based on the current level, ensuring a unique learning experience every time.
 
 ---
 
-## ⚙️ How it Works
-- **3D Engine**: Leverages **Google `<model-viewer>`** for high-fidelity, interactive 3D rendering of the Ashoka Chakra.
-- **Atmospheric UI**: A custom-built CSS particle and nebula system creates a sense of depth, mimicking a "Metaverse" environment.
-- **Smart Efficiency**: All heavy 3D assets are **lazy-loaded** via Intersection Observers, ensuring the repo stays under **3MB** while maintaining a premium feel.
-- **AI Integration**: Features a `Civic AI Guide` (integrated via Gemini/AI Agent) to provide dynamic quiz data and contextual explanations.
+## 🛠️ How it Works
+
+### ✨ Immersive Metaverse UI
+- **3D Interactive Monuments:** Integrated Google's `<model-viewer>` for high-performance 3D rendering of Indian architectural landmarks (Ashoka Chakra, Gateway of India).
+- **Particle & Star Fields:** A cinematic backdrop built with optimized CSS animations to minimize CPU load while maintaining a premium feel.
+- **Real-time Stat Pulse:** Live-pulsing statistics (Eligible Voters, Polling Stations) simulate a "living" democratic database.
+
+### 🗳️ Core Features
+- **AI Chat Guide:** A Hindi-English (Hinglish) speaking AI that explains election laws in simple, celebratory terms.
+- **Interactive Timeline:** Visualizes the chronological steps of an election, from the Model Code of Conduct to the Vote of Confidence.
+- **Accessibility First:** Fully ARIA-compliant navigation, "Skip to Content" support, and high-contrast visuals for inclusive civic engagement.
 
 ---
 
-## 📋 Assumptions Made
-1.  **Browser Capabilities**: Assumes a modern browser with **WebGL 2.0** support for 3D rendering.
-2.  **Connectivity**: Assumes a stable internet connection for fetching 3D assets and AI-generated quiz content.
-3.  **UI Scale**: Designed primarily for desktop/tablet "immersive" viewing, with responsive stacking for mobile.
+## 🌐 Google Services Integration
+This project leverages the Google ecosystem to ensure production-grade quality:
+1.  **Google Gemini AI:** Specialized deep-dive analysis and parallel reasoning for quiz facts.
+2.  **Google Analytics (gtag):** Integrated real-time traffic monitoring and user engagement tracking.
+3.  **Google Fonts:** Utilizing `Baloo 2` and `Outfit` for a modern, culturally resonant aesthetic.
+4.  **Google Model-Viewer:** For robust, cross-platform 3D rendering of civic monuments.
 
 ---
 
-## ✅ Testing & Validation
-- **Accessibility Audit**: Verified with ARIA-compliance for screen readers (All 3D frames and interactive buttons have descriptive labels).
-- **Cross-Browser Testing**: Validated on Chrome, Safari, and Firefox for animation consistency.
-- **Performance Benchmarking**: Maintained 60fps animations even with multiple 3D models using lazy-loading triggers.
+## 📝 Assumptions & Constraints
+- **Data Period:** The app assumes a 2026 electoral landscape to align with future-ready civic initiatives.
+- **Connectivity:** Assumes active API access for NVIDIA and Google endpoints (local fallback logic is included for resilience).
+- **Security:** API keys are managed via environment variables to ensure safe, responsible implementation.
 
 ---
 
-## 🏆 Technology Stack
-- **Frontend**: React (Vite) + TypeScript
-- **3D Rendering**: Google `<model-viewer>` + Sketchfab API
-- **Styling**: Vanilla CSS3 (Glassmorphism, Parallax)
-- **Evaluation Priority**: Code Quality, Security, and Meaningful Google Services integration.
+## 🚀 Getting Started
+
+1. **Clone the repo:** `git clone [repository-url]`
+2. **Setup Environment:** Create a `.env.local` with your `VITE_LMA_API_KEY`, `VITE_KIMI_API_KEY`, and `VITE_GEMINI_API_KEY`.
+3. **Install & Run:**
+   ```bash
+   npm install
+   npm run dev
+   ```
 
 ---
-*Created for the India's Civic Adventure Hackathon 2026*
+
+**Jai Hind! Mera Vote, Meri Awaaz! 🇮🇳**
